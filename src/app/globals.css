@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SISTEMA DE DISEÑO
+   Oscuro, gaming, sobrio. Un solo acento cálido (llama) + un frío (plasma)
+   para estados y datos. Nada de degradados por todas partes: el color se gana
+   el sitio marcando lo accionable.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  --color-void: #06070c;
+  --color-abyss: #0b0d15;
+  --color-surface: #11141f;
+  --color-surface-2: #171b29;
+  --color-line: #232838;
+  --color-line-soft: #1b1f2c;
+
+  --color-ink: #f2f4f9;
+  --color-muted: #9aa3b8;
+  --color-faint: #646e85;
+
+  --color-flame-400: #ff9d3d;
+  --color-flame-500: #ff7a18;
+  --color-flame-600: #e85d02;
+
+  --color-plasma-400: #4fd8ff;
+  --color-plasma-500: #16b6e8;
+
+  --color-ok: #35d07f;
+  --color-warn: #f5b942;
+  --color-danger: #ff5a5f;
+
+  --font-sans: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+
+  --radius-card: 16px;
+
+  --shadow-glow: 0 0 0 1px rgb(255 122 24 / 0.25), 0 12px 40px -12px rgb(255 122 24 / 0.45);
+  --shadow-panel: 0 24px 60px -32px rgb(0 0 0 / 0.9);
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+* {
+  border-color: var(--color-line-soft);
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Resplandor ambiental fijo: da profundidad sin coste de repintado. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, rgb(255 122 24 / 0.10), transparent 60%),
+    radial-gradient(50rem 35rem at 95% 0%, rgb(22 182 232 / 0.08), transparent 60%);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-flame-500);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: rgb(255 122 24 / 0.35);
+}
+
+/* Scrollbar discreta y coherente con el tema. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--color-abyss); }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #2f3549; }
+
+/* ── Utilidades de composición ────────────────────────────────────────────── */
+
+@utility panel {
+  background: linear-gradient(180deg, rgb(23 27 41 / 0.9), rgb(17 20 31 / 0.9));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-panel);
+}
+
+@utility hairline {
+  border-bottom: 1px solid var(--color-line-soft);
+}
+
+@utility text-gradient-flame {
+  background: linear-gradient(100deg, var(--color-flame-400), #ffd08a 55%, var(--color-plasma-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Animación de entrada ─────────────────────────────────────────────────────
+   Rápida (≈1 s) y por encima del contenido, no una pantalla de carga: el HTML
+   ya está pintado debajo. Al terminar, el overlay se retira del árbol.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes intro-fade-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes intro-mark-in {
+  0%   { opacity: 0; transform: scale(0.86) translateY(6px); filter: blur(6px); }
+  60%  { opacity: 1; transform: scale(1.02) translateY(0); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes intro-sweep {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.intro-overlay {
+  animation: intro-fade-out 320ms ease 780ms forwards;
+}
+
+.intro-mark {
+  animation: intro-mark-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.intro-sweep {
+  animation: intro-sweep 900ms cubic-bezier(0.4, 0, 0.2, 1) 120ms both;
+}
+
+/* Aparición escalonada del contenido principal. */
+.rise {
+  animation: rise-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rise-1 { animation-delay: 60ms; }
+.rise-2 { animation-delay: 140ms; }
+.rise-3 { animation-delay: 220ms; }
+.rise-4 { animation-delay: 300ms; }
+
+/* ── Cascada de logos del fondo ───────────────────────────────────────────────
+   Cada pieza cae desde arriba de la pantalla hasta abajo, con una deriva
+   lateral y un giro suave. Solo se tocan `transform` y `opacity`: el navegador
+   las resuelve en la GPU, así que la animación no obliga a recalcular el
+   diseño ni a repintar el texto que hay encima.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes logo-drop {
+  0% {
+    transform: translate3d(0, -25vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--drop-opacity, 0.06);
+  }
+  88% {
+    opacity: var(--drop-opacity, 0.06);
+  }
+  100% {
+    transform: translate3d(var(--drop-drift, 0), 122vh, 0) rotate(var(--drop-spin, 90deg));
+    opacity: 0;
+  }
+}
+
+.logo-drop {
+  animation-name: logo-drop;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+/* ── Tarjeta de juego: borde con líneas en movimiento ─────────────────────────
+   Cómo funciona: un cuadrado con un degradado CÓNICO gira detrás de la
+   tarjeta; encima va una capa opaca separada 2 px del borde, así que del
+   degradado solo se ve el filo. El resultado son dos trazos de luz recorriendo
+   el contorno. Se anima únicamente `transform` (lo mueve la GPU): no provoca
+   recálculos de diseño ni repintados del contenido.
+
+   No se usa `@property --angle` a propósito: no está disponible en Firefox ni
+   en Safari antiguos, y ahí el borde se quedaría quieto.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes border-spin {
+  to { transform: translate(-50%, -50%) rotate(1turn); }
+}
+
+@utility line-border {
+  position: relative;
+  isolation: isolate;
+  border-radius: 20px;
+  background: var(--color-line);
+  padding: 2px;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 175%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    background: conic-gradient(
+      from 0turn,
+      transparent 0turn 0.06turn,
+      var(--color-flame-500) 0.12turn,
+      var(--color-flame-400) 0.16turn,
+      transparent 0.24turn 0.56turn,
+      var(--color-plasma-500) 0.62turn,
+      var(--color-plasma-400) 0.66turn,
+      transparent 0.74turn 1turn
+    );
+    animation: border-spin 4.5s linear infinite;
+  }
+}
+
+/* Zoom fuerte al hacer clic, antes de saltar a la tienda. La navegación se
+   dispara cuando termina, así que la duración de aquí y la del componente
+   (ZOOM_MS) tienen que coincidir. */
+@keyframes card-dive {
+  0%   { transform: scale(1); opacity: 1; }
+  55%  { transform: scale(1.5); opacity: 0.85; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.card-dive {
+  animation: card-dive 520ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+/* ── Accesibilidad: respeto total a prefers-reduced-motion ────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* El overlay desaparece de inmediato en vez de animarse. */
+  .intro-overlay { display: none !important; }
+  .rise { opacity: 1 !important; transform: none !important; }
+
+  /* El borde deja de girar: se queda como un contorno fijo, no parpadeando. */
+  .line-border::before { animation: none !important; }
+
+  /* La cascada del fondo se retira entera: quieta no aporta nada y unos logos
+     congelados a media pantalla se leerían como un fallo de carga. */
+  .logo-drop { display: none !important; }
+  /* Sin zoom de salida: se navega directamente (lo gestiona el componente). */
+  .card-dive { animation: none !important; opacity: 1 !important; transform: none !important; }
+}

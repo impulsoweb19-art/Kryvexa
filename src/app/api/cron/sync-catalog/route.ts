@@ -1,0 +1,25 @@
+import { ok, route } from "@/lib/api";
+import { env } from "@/lib/env";
+import { AppError } from "@/lib/errors";
+import { safeCompare } from "@/lib/session";
+import { syncCatalog } from "@/server/services/catalog";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Refresco del catálogo. Llamar cada 30-60 minutos:
+ *   curl -H "Authorization: Bearer $CRON_SECRET" https://tu-dominio/api/cron/sync-catalog
+ */
+export const POST = route("cron.syncCatalog", async (req) => {
+  const header = req.headers.get("authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token || !safeCompare(token, env().CRON_SECRET)) {
+    throw new AppError("FORBIDDEN", { internalMessage: "CRON_SECRET inválido" });
+  }
+
+  const result = await syncCatalog();
+  return ok(result);
+});
+
+export const GET = POST;

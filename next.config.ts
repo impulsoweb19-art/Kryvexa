@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  /**
+   * `standalone` empaqueta un servidor mínimo para arrancar con `node
+   * server.js`: es lo que necesita el Dockerfile / un VPS. En Vercel no hace
+   * falta (su propio sistema de compilación arma el despliegue) y además
+   * rompe `next start`, así que ahí se desactiva. Vercel define `VERCEL=1`
+   * en todas sus compilaciones.
+   */
+  output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
   experimental: {
