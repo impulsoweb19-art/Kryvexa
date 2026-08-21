@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+.env
+.env.local
+.env.production
+storage/
+!storage/.gitkeep
+*.log
+.DS_Store
+next-env.d.ts
+tsconfig.tsbuildinfo
+coverage/
+
+.postgres-demo/

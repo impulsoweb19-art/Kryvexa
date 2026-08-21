@@ -1,0 +1,67 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  ARRANQUE LOCAL PARA VER LA PLATAFORMA FUNCIONANDO
+#
+#      docker compose -f docker-compose.dev.yml up
+#
+#  Levanta PostgreSQL, prepara la base de datos, crea el administrador y un
+#  catálogo de ejemplo. No hay que editar ningún archivo antes.
+#
+#  ⚠  ESTE ARCHIVO NO ES PARA PRODUCCIÓN. Los secretos están escritos aquí a la
+#     vista y el proveedor va en modo simulado. Para publicar usa
+#     `docker-compose.yml`, que lee todo desde tu `.env`.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: recargas
+      POSTGRES_PASSWORD: recargas
+      POSTGRES_DB: recargas
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recargas"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgresql://recargas:recargas@db:5432/recargas
+
+      # Secretos de juguete: válidos SOLO para mirar la app en tu máquina.
+      SESSION_SECRET: solo-para-ver-en-local-no-usar-en-produccion-0123456789
+      CRON_SECRET: solo-para-ver-en-local-1234
+
+      # Sin API key: el proveedor responde con datos de ejemplo.
+      PROVIDER_MOCK: "true"
+      RECARGAS_AMERICA_BASE_URL: https://panel.recargasamerica.com/api/v1
+      RECARGAS_AMERICA_API_KEY: ""
+      RECARGAS_AMERICA_TIMEOUT_MS: "30000"
+
+      RECEIPTS_DIR: /app/storage/receipts
+      MAX_RECEIPT_BYTES: "5242880"
+
+      # Administrador que se crea automáticamente al arrancar.
+      SEED_ADMIN_EMAIL: admin@demo.local
+      SEED_ADMIN_PASSWORD: Demo12345
+      SEED_ADMIN_NAME: Administrador
+      # Rellena la tienda con los paquetes de Free Fire de ejemplo.
+      SEED_DEMO_CATALOG: "true"
+    volumes:
+      - receipts_dev:/app/storage/receipts
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata_dev:
+  receipts_dev:

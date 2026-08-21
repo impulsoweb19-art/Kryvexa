@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-recargas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-recargas}
+      POSTGRES_DB: ${POSTGRES_DB:-recargas}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recargas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Sin `ports:` a propósito: la base solo es accesible desde la red interna
+    # de Docker. Para inspeccionarla, usa un túnel SSH.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-recargas}:${POSTGRES_PASSWORD:-recargas}@db:5432/${POSTGRES_DB:-recargas}
+      APP_URL: ${APP_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      CRON_SECRET: ${CRON_SECRET}
+      RECARGAS_AMERICA_BASE_URL: ${RECARGAS_AMERICA_BASE_URL:-https://panel.recargasamerica.com/api/v1}
+      RECARGAS_AMERICA_API_KEY: ${RECARGAS_AMERICA_API_KEY}
+      RECARGAS_AMERICA_TIMEOUT_MS: ${RECARGAS_AMERICA_TIMEOUT_MS:-30000}
+      PROVIDER_MOCK: ${PROVIDER_MOCK:-false}
+      RECEIPTS_DIR: /app/storage/receipts
+      MAX_RECEIPT_BYTES: ${MAX_RECEIPT_BYTES:-5242880}
+    volumes:
+      # Los comprobantes sobreviven a los redespliegues.
+      - receipts:/app/storage/receipts
+    ports:
+      - "127.0.0.1:3000:3000"
+    # Publicado solo en localhost: delante debe ir Nginx/Caddy con HTTPS.
+
+  # Conciliación de órdenes pendientes + limpieza de rate limits.
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null &&
+      while true; do
+        curl -s -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/reconcile-orders >/dev/null || true;
+        sleep 120;
+      done"
+
+  # Refresco del catálogo cada 30 minutos.
+  cron-catalog:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null &&
+      while true; do
+        curl -s -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/sync-catalog >/dev/null || true;
+        sleep 1800;
+      done"
+
+volumes:
+  pgdata:
+  receipts:
