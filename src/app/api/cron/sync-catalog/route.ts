@@ -14,7 +14,15 @@ export const dynamic = "force-dynamic";
 export const POST = route("cron.syncCatalog", async (req) => {
   const header = req.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  if (!token || !safeCompare(token, env().CRON_SECRET)) {
+  const secret = env().CRON_SECRET;
+  // Sin secreto configurado no se atiende a nadie: es preferible que la tarea
+  // programada no corra que dejar este endpoint abierto al mundo.
+  if (!secret) {
+    throw new AppError("FORBIDDEN", {
+      internalMessage: "CRON_SECRET no está configurado; las tareas programadas quedan deshabilitadas",
+    });
+  }
+  if (!token || !safeCompare(token, secret)) {
     throw new AppError("FORBIDDEN", { internalMessage: "CRON_SECRET inválido" });
   }
 

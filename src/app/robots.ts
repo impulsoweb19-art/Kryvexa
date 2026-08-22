@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { baseUrlString } from "@/lib/base-url";
 
 /**
  * robots.txt generado por Next.js (aparece en /robots.txt).
@@ -9,7 +10,7 @@ import type { MetadataRoute } from "next";
  * evita que aparezcan enlaces internos en los resultados de búsqueda.
  */
 export default function robots(): MetadataRoute.Robots {
-  const base = process.env.APP_URL ?? "http://localhost:3000";
+  const base = baseUrlString();
 
   return {
     rules: {

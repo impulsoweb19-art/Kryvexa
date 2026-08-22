@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { baseUrlString } from "@/lib/base-url";
 
 /**
  * sitemap.xml generado por Next.js (aparece en /sitemap.xml).
@@ -8,7 +9,7 @@ import type { MetadataRoute } from "next";
  * (ver robots.ts).
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.APP_URL ?? "http://localhost:3000";
+  const base = baseUrlString();
   const now = new Date();
 
   return [

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { IntroAnimation } from "@/components/layout/IntroAnimation";
 import { DEFAULT_CONFIG, getConfig } from "@/server/services/settings";
+import { baseUrl } from "@/lib/base-url";
 
 /**
  * Título de la pestaña y texto que muestra Google.
@@ -23,9 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    // Necesario para que las URLs canónicas y de compartir en redes se armen
-    // bien con tu dominio real en producción (si falta, Next usa localhost).
-    metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
+    // `baseUrl()` tolera una APP_URL mal escrita (por ejemplo sin https://) en
+    // vez de lanzar un error que impediría generar las páginas.
+    metadataBase: baseUrl(),
     title: {
       default: `${storeName} | Todo lo que necesitas, en un solo lugar`,
       template: `%s · ${storeName}`,

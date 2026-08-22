@@ -110,6 +110,17 @@ export async function storeReceipt(file: File): Promise<StoredReceipt> {
  */
 async function write(relativePath: string, buffer: Buffer, mime: AllowedMime): Promise<string> {
   if (env().STORAGE_DRIVER === "blob") {
+    // La comprobación va aquí y no en la validación global del entorno: así,
+    // si el almacén está mal configurado, falla SOLO esto y no toda la web.
+    if (!env().BLOB_READ_WRITE_TOKEN) {
+      throw new AppError("INTERNAL", {
+        userMessage:
+          "Ahora mismo no podemos recibir comprobantes. Avísanos por soporte y lo resolvemos en minutos.",
+        internalMessage:
+          "STORAGE_DRIVER=blob pero falta BLOB_READ_WRITE_TOKEN. En Vercel: Storage → Create Database → Blob (lo añade solo). Alternativa temporal: STORAGE_DRIVER=local.",
+      });
+    }
+
     // Vercel Blob no tiene "privado por sesión": la URL que devuelve es
     // impredecible (nombre aleatorio + sufijo aleatorio), y aun así nunca la
     // ve el navegador — solo la usa el servidor en readReceiptStream().
