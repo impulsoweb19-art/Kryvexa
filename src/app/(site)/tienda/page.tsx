@@ -65,23 +65,23 @@ export default async function StorePage() {
               <span className="h-px flex-1 bg-line-soft" />
             </h2>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
               {items.map((p, i) => {
                 const affordable = balance.balanceCents >= p.priceCents;
                 return (
                   <Link
                     key={p.id}
                     href={`/tienda/${p.id}`}
-                    className={`panel group flex flex-col justify-between p-5 transition-all hover:-translate-y-0.5 hover:border-flame-500/50 rise rise-${(i % 4) + 1}`}
+                    className={`panel group flex flex-col justify-between p-4 sm:p-5 transition-all hover:-translate-y-0.5 hover:border-flame-500/50 rise rise-${(i % 4) + 1}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-lg font-bold leading-tight">{p.packageName}</h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-base font-bold leading-tight sm:text-lg">{p.packageName}</h3>
                       {p.validationSupported && <Badge tone="info">ID verificable</Badge>}
                     </div>
 
-                    <div className="mt-6 flex items-end justify-between gap-3">
+                    <div className="mt-4 flex flex-col items-start gap-2 sm:mt-6 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
                       <div>
-                        <span className="block text-2xl font-black tabular-nums text-flame-400">
+                        <span className="block text-xl font-black tabular-nums text-flame-400 sm:text-2xl">
                           {formatPEN(p.priceCents)}
                         </span>
                         {!affordable && (
