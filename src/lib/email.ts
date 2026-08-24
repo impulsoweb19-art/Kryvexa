@@ -34,9 +34,9 @@ export async function sendVerificationCodeEmail(to: string, code: string): Promi
     subject: `Tu código de verificación es ${code}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-        <h2 style="margin:0 0 12px">Confirma que eres tú</h2>
+        <h2 style="margin:0 0 12px">Recupera tu cuenta</h2>
         <p style="color:#444;line-height:1.5">
-          Usa este código para confirmar el cambio de contraseña en tu cuenta de Kryvexa.
+          Usa este código para poner una contraseña nueva en tu cuenta de Kryvexa.
           Vence en 10 minutos.
         </p>
         <p style="font-size:32px;font-weight:700;letter-spacing:6px;margin:24px 0;text-align:center">

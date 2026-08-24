@@ -1,5 +1,5 @@
 {
-  "id": "929a588c-1aad-4428-9b1c-5540473b14ed",
+  "id": "5d3316de-aefa-46e3-9833-08bcd0a2c277",
   "prevId": "ea8e410e-22c2-4032-b5d0-13c12d36ba60",
   "version": "7",
   "dialect": "postgresql",
@@ -1784,7 +1784,7 @@
       "name": "verification_purpose",
       "schema": "public",
       "values": [
-        "ACCOUNT_UPDATE"
+        "PASSWORD_RESET"
       ]
     }
   },

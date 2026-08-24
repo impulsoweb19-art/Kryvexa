@@ -38,7 +38,7 @@ export const txReasonEnum = pgEnum("tx_reason", [
   "ADMIN_ADJUSTMENT",
 ]);
 export const depositStatusEnum = pgEnum("deposit_status", ["PENDING", "APPROVED", "REJECTED"]);
-export const verificationPurposeEnum = pgEnum("verification_purpose", ["ACCOUNT_UPDATE"]);
+export const verificationPurposeEnum = pgEnum("verification_purpose", ["PASSWORD_RESET"]);
 export const productKindEnum = pgEnum("product_kind", [
   "GAME_PACKAGE", // /products/games  → /buy/games
   "PIN", // /products/pins (type=pin)      → /buy/pins {quantity}

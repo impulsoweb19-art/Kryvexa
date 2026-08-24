@@ -22,38 +22,6 @@ export function AccountForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [codeCooldown, setCodeCooldown] = useState(0);
-
-  async function onSendCode() {
-    setSendingCode(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/auth/account/verification-code", { method: "POST" });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.success) {
-        throw new Error(json?.error ?? "No pudimos enviar el código.");
-      }
-      setMessage({
-        tone: "ok",
-        text: "Te enviamos un código de verificación a tu correo. Vence en 10 minutos.",
-      });
-      setCodeCooldown(60);
-      const interval = setInterval(() => {
-        setCodeCooldown((s) => {
-          if (s <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    } catch (err) {
-      setMessage({ tone: "danger", text: (err as Error).message });
-    } finally {
-      setSendingCode(false);
-    }
-  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -67,7 +35,6 @@ export function AccountForm({
       currentPassword: String(form.get("currentPassword") ?? ""),
       newPassword: String(form.get("newPassword") ?? ""),
       confirmNewPassword: String(form.get("confirmNewPassword") ?? ""),
-      verificationCode: String(form.get("verificationCode") ?? ""),
     });
 
     if (!parsed.success) {
@@ -157,33 +124,6 @@ export function AccountForm({
             type="password"
             autoComplete="new-password"
           />
-        </Field>
-
-        <Field
-          label="Código de verificación"
-          htmlFor="verificationCode"
-          hint="Solo si vas a cambiar la contraseña: te lo enviamos por correo."
-          error={errors.verificationCode}
-        >
-          <div className="flex gap-2">
-            <Input
-              id="verificationCode"
-              name="verificationCode"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="000000"
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onSendCode}
-              loading={sendingCode}
-              disabled={codeCooldown > 0}
-            >
-              {codeCooldown > 0 ? `Reenviar (${codeCooldown}s)` : "Enviar código"}
-            </Button>
-          </div>
         </Field>
       </Card>
 

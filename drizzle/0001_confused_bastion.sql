@@ -1,4 +1,4 @@
-CREATE TYPE "public"."verification_purpose" AS ENUM('ACCOUNT_UPDATE');--> statement-breakpoint
+CREATE TYPE "public"."verification_purpose" AS ENUM('PASSWORD_RESET');--> statement-breakpoint
 CREATE TABLE "verification_codes" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid()::text NOT NULL,
 	"user_id" text NOT NULL,

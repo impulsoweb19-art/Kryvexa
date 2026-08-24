@@ -28,7 +28,6 @@ export const PATCH = route("auth.account.update", async (req) => {
     name: input.name,
     email: input.email,
     newPassword: input.newPassword,
-    verificationCode: input.verificationCode,
   });
 
   return ok({ user: updated, passwordChanged: Boolean(input.newPassword) });
