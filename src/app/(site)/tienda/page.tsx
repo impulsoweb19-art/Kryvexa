@@ -74,13 +74,17 @@ export default async function StorePage() {
                     href={`/tienda/${p.id}`}
                     className={`panel group flex flex-col justify-between overflow-hidden transition-all hover:-translate-y-0.5 hover:border-flame-500/50 rise rise-${(i % 4) + 1}`}
                   >
-                    <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-surface-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.imageUrl}
-                        alt=""
-                        className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                      />
+                    <div className="shrink-0 p-3 pb-0 sm:p-4 sm:pb-0">
+                      <div className="line-border">
+                        <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-[18px] bg-abyss">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.imageUrl}
+                            alt=""
+                            className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                          />
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex flex-1 flex-col justify-between p-4 sm:p-5">
