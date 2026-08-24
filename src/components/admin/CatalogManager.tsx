@@ -18,6 +18,7 @@ export interface AdminProductRow {
   active: boolean;
   validationSupported: boolean;
   inputLabels: string[];
+  hasImage: boolean;
 }
 
 export function CatalogManager({
@@ -36,6 +37,10 @@ export function CatalogManager({
   const [message, setMessage] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [imageBusy, setImageBusy] = useState<string | null>(null);
+  // Cambia por producto al subir/quitar una imagen, para forzar que el
+  // navegador la vuelva a pedir en vez de mostrar la que tenía en caché.
+  const [imageVersions, setImageVersions] = useState<Record<string, number>>({});
 
   async function sync() {
     setSyncing(true);
@@ -71,6 +76,41 @@ export function CatalogManager({
       setMessage({ tone: "danger", text: (e as Error).message });
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function uploadImage(productId: string, file: File) {
+    setImageBusy(productId);
+    setMessage(null);
+    try {
+      const body = new FormData();
+      body.append("productId", productId);
+      body.append("image", file);
+      const res = await fetch("/api/admin/catalog/image", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error ?? "No se pudo subir la imagen.");
+      setImageVersions((v) => ({ ...v, [productId]: (v[productId] ?? 0) + 1 }));
+      router.refresh();
+    } catch (e) {
+      setMessage({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setImageBusy(null);
+    }
+  }
+
+  async function clearImage(productId: string) {
+    setImageBusy(productId);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/catalog/image?productId=${productId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error ?? "No se pudo quitar la imagen.");
+      setImageVersions((v) => ({ ...v, [productId]: (v[productId] ?? 0) + 1 }));
+      router.refresh();
+    } catch (e) {
+      setMessage({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setImageBusy(null);
     }
   }
 
@@ -124,7 +164,47 @@ export function CatalogManager({
           {products.map((p) => (
             <Card key={p.id} className={cx("py-4", !p.active && "opacity-60")}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <div className="flex shrink-0 items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={
+                        p.hasImage
+                          ? `/api/products/${p.id}/image?v=${imageVersions[p.id] ?? 0}`
+                          : "/juegos/free-fire.jpg"
+                      }
+                      alt=""
+                      className="size-14 shrink-0 rounded-lg border border-line-soft bg-surface-2 object-cover"
+                    />
+                    <div className="space-y-1">
+                      <label className="block cursor-pointer text-xs font-medium text-flame-400 hover:underline">
+                        {imageBusy === p.id ? "Subiendo…" : p.hasImage ? "Cambiar imagen" : "Subir imagen"}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          disabled={imageBusy === p.id}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) void uploadImage(p.id, file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {p.hasImage && (
+                        <button
+                          type="button"
+                          disabled={imageBusy === p.id}
+                          onClick={() => clearImage(p.id)}
+                          className="block text-xs text-faint hover:text-danger disabled:opacity-50"
+                        >
+                          Quitar imagen
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{p.packageName}</span>
                     <Badge tone="neutral">{p.gameName}</Badge>
@@ -138,6 +218,7 @@ export function CatalogManager({
                   <p className="mt-1 text-xs text-faint">
                     Costo {formatUSD(p.costUsdCents)} · Campos: {p.inputLabels.join(", ") || "—"}
                   </p>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">

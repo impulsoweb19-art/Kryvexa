@@ -34,6 +34,17 @@ export interface StoreProduct {
   validationSupported: boolean;
   featured: boolean;
   sortOrder: number;
+  imageUrl: string;
+}
+
+/**
+ * URL de la imagen de un producto: la que subió el admin (servida por
+ * /api/products/[id]/image, con sesión) o, a falta de esa, la portada
+ * genérica del juego. Solo Free Fire en la v1, así que un único fallback
+ * basta; con más juegos habría que mapear por `gameName`.
+ */
+export function productImageUrl(product: Pick<Product, "id" | "imagePath">): string {
+  return product.imagePath ? `/api/products/${product.id}/image` : "/juegos/free-fire.jpg";
 }
 
 /** Precio final en céntimos de PEN. Respeta el precio fijo del admin si existe. */
@@ -54,6 +65,7 @@ export function toStoreProduct(product: Product, config: StoreConfig): StoreProd
     validationSupported: product.validationSupported,
     featured: product.featured,
     sortOrder: product.sortOrder,
+    imageUrl: productImageUrl(product),
   };
 }
 
@@ -189,6 +201,33 @@ export async function updateProductOverride(
   const [updated] = await db
     .update(products)
     .set({ ...patch, updatedAt: new Date() })
+    .where(eq(products.id, productId))
+    .returning();
+  if (!updated) throw new AppError("NOT_FOUND");
+  return updated;
+}
+
+/** Fija la imagen subida por el admin para un paquete. */
+export async function setProductImage(productId: string, imagePath: string): Promise<Product> {
+  const [updated] = await db
+    .update(products)
+    .set({ imagePath, updatedAt: new Date() })
+    .where(eq(products.id, productId))
+    .returning();
+  if (!updated) throw new AppError("NOT_FOUND");
+  return updated;
+}
+
+/**
+ * Quita la imagen del paquete (vuelve a la portada genérica del juego).
+ *
+ * El archivo subido no se borra del almacenamiento, igual que al restaurar
+ * el QR de Yape: son pocos KB y así no se arriesga borrar algo por error.
+ */
+export async function clearProductImage(productId: string): Promise<Product> {
+  const [updated] = await db
+    .update(products)
+    .set({ imagePath: null, updatedAt: new Date() })
     .where(eq(products.id, productId))
     .returning();
   if (!updated) throw new AppError("NOT_FOUND");

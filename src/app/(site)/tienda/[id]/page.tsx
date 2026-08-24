@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Badge, Card } from "@/components/ui";
 import { PurchasePanel } from "@/components/store/PurchasePanel";
 import { requireUserPage } from "@/lib/guards";
-import { getProductById, sellPriceCents } from "@/server/services/catalog";
+import { getProductById, productImageUrl, sellPriceCents } from "@/server/services/catalog";
 import { getConfig } from "@/server/services/settings";
 import { getBalance } from "@/server/services/wallet";
 import type { ProviderInputField } from "@/server/providers/types";
@@ -36,10 +36,20 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
         <div className="rise rise-1 space-y-4">
           <Card>
-            <p className="text-xs font-medium uppercase tracking-wider text-faint">
-              {product.gameName}
-            </p>
-            <h1 className="mt-1.5 text-2xl font-black sm:text-3xl">{product.packageName}</h1>
+            <div className="flex items-start gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={productImageUrl(product)}
+                alt=""
+                className="size-16 shrink-0 rounded-xl border border-line-soft bg-surface-2 object-cover sm:size-20"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-faint">
+                  {product.gameName}
+                </p>
+                <h1 className="mt-1.5 text-2xl font-black sm:text-3xl">{product.packageName}</h1>
+              </div>
+            </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge tone="info">Entrega automática</Badge>
