@@ -83,8 +83,8 @@ export function LogoRain() {
           <Image
             src="/marca/kryvexa-mascota.png"
             alt=""
-            width={364}
-            height={334}
+            width={334}
+            height={306}
             sizes="80px"
             className="size-full object-contain"
           />

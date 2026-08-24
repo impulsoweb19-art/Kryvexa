@@ -27,8 +27,8 @@ export function LogoMark({ className }: { className?: string }) {
     <Image
       src="/marca/kryvexa-mascota.png"
       alt=""
-      width={364}
-      height={334}
+      width={334}
+      height={306}
       priority
       className={cx("size-9 w-auto object-contain", className)}
       aria-hidden
