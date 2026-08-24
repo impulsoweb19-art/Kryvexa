@@ -237,6 +237,13 @@ export const products = pgTable(
     gameName: varchar("game_name", { length: 120 }).notNull(),
     packageName: varchar("package_name", { length: 160 }).notNull(),
     description: text("description"),
+    /**
+     * Imagen del paquete que sube el administrador. Igual que
+     * `settings.yapeQrPath`: ruta relativa a RECEIPTS_DIR (driver "local") o
+     * URL completa de Vercel Blob (driver "blob"). Null → la tienda usa la
+     * portada genérica del juego (`toStoreProduct` en catalog.ts).
+     */
+    imagePath: text("image_path"),
     /** `price` del proveedor en céntimos de USD. Es nuestro COSTO. */
     costUsdCents: integer("cost_usd_cents").notNull(),
     /** Precio de venta fijo en PEN. Null → se calcula con tipo de cambio + margen. */

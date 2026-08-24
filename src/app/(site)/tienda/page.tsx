@@ -74,9 +74,21 @@ export default async function StorePage() {
                     href={`/tienda/${p.id}`}
                     className={`panel group flex flex-col justify-between p-4 sm:p-5 transition-all hover:-translate-y-0.5 hover:border-flame-500/50 rise rise-${(i % 4) + 1}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-base font-bold leading-tight sm:text-lg">{p.packageName}</h3>
-                      {p.validationSupported && <Badge tone="info">ID verificable</Badge>}
+                    <div className="flex items-start gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.imageUrl}
+                        alt=""
+                        className="size-11 shrink-0 rounded-lg border border-line-soft bg-surface-2 object-cover sm:size-12"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base font-bold leading-tight sm:text-lg">{p.packageName}</h3>
+                        {p.validationSupported && (
+                          <span className="mt-1 inline-block">
+                            <Badge tone="info">ID verificable</Badge>
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-4 flex flex-col items-start gap-2 sm:mt-6 sm:flex-row sm:items-end sm:justify-between sm:gap-3">

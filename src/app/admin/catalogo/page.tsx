@@ -28,6 +28,7 @@ export default async function AdminCatalogPage() {
     active: p.active,
     validationSupported: p.validationSupported,
     inputLabels: ((p.inputFields as ProviderInputField[]) ?? []).map((f) => f.label),
+    hasImage: Boolean(p.imagePath),
   }));
 
   const lastSync = products

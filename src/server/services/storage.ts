@@ -171,6 +171,37 @@ export async function storeQr(file: File): Promise<StoredReceipt> {
 }
 
 /**
+ * Guarda la imagen de un paquete que sube el administrador en el catálogo.
+ *
+ * Mismas reglas que el QR: se muestra como `<img>` en la tienda, así que
+ * tampoco se acepta PDF aquí.
+ */
+export async function storeProductImage(file: File): Promise<StoredReceipt> {
+  const maxBytes = env().MAX_RECEIPT_BYTES;
+
+  if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
+    throw new AppError("UPLOAD_INVALID", { userMessage: "Elige la imagen del paquete." });
+  }
+  if (file.size > maxBytes) {
+    throw new AppError("UPLOAD_INVALID", {
+      userMessage: `La imagen supera el máximo de ${Math.round(maxBytes / 1024 / 1024)} MB.`,
+    });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mime = sniffMime(buffer);
+  if (!mime || mime === "application/pdf") {
+    throw new AppError("UPLOAD_INVALID", {
+      userMessage: "La imagen debe ser JPG, PNG o WebP (no un PDF).",
+      internalMessage: `magic bytes: ${mime ?? "desconocidos"} (declarado: ${file.type})`,
+    });
+  }
+
+  const relativePath = path.join("productos", `${randomUUID()}.${ALLOWED[mime]}`);
+  return { relativePath: await write(relativePath, buffer, mime), mime, size: buffer.length };
+}
+
+/**
  * Deduce el Content-Type a partir de la extensión del archivo guardado.
  *
  * Solo se usa para archivos que ESTE módulo escribió: la extensión se asignó
