@@ -88,7 +88,7 @@ export default async function StorePage() {
                           <span className="text-xs text-warn">Saldo insuficiente</span>
                         )}
                       </div>
-                      <span className="rounded-lg border-2 border-danger px-3 py-2 text-sm font-semibold text-ink transition-colors group-hover:bg-danger/10">
+                      <span className="rounded-lg border-2 border-[#ff2d2d] px-3 py-2 text-sm font-semibold text-ink shadow-[0_0_10px_1px_rgb(255_45_45_/_0.6)]">
                         Comprar →
                       </span>
                     </div>
