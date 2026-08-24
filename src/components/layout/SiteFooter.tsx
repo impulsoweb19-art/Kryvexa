@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoMark } from "@/components/brand/Logo";
+import { LogoMark, LogoMascot } from "@/components/brand/Logo";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/brand/SocialIcons";
 import { getConfig } from "@/server/services/settings";
 
@@ -46,7 +46,9 @@ export async function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.5fr_1fr_1fr]">
         {/* ── Marca ────────────────────────────────────────────────────── */}
         <div>
-          <div className="flex items-center gap-2.5">
+          <LogoMascot className="h-20 -ml-2" />
+
+          <div className="mt-2 flex items-center gap-2.5">
             <LogoMark className="size-10" />
             <span className="text-lg font-bold tracking-tight">
               {name.length > 3 ? name.slice(0, -3) : name}

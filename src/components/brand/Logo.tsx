@@ -9,8 +9,9 @@ import { cx } from "@/components/ui";
  * gris oscuro, pie). Para cambiarlo basta reemplazar esos dos archivos por
  * otros con el mismo nombre; no hay que tocar código:
  *
- *   public/marca/kryvexa-marca.png → solo el símbolo (hexágono)
- *   public/marca/kryvexa-logo.png  → símbolo + nombre
+ *   public/marca/kryvexa-marca.png   → solo el símbolo (hexágono)
+ *   public/marca/kryvexa-logo.png    → símbolo + nombre
+ *   public/marca/kryvexa-mascota.png → el conejo abrazando el símbolo
  */
 
 export function LogoMark({ className }: { className?: string }) {
@@ -60,6 +61,25 @@ export function LogoFull({ className }: { className?: string }) {
       width={418}
       height={256}
       className={cx("h-16 w-auto object-contain", className)}
+    />
+  );
+}
+
+/**
+ * Mascota de la marca (el conejo abrazando el símbolo). Es la pieza más
+ * ilustrativa, así que se usa donde hay espacio para que se note el detalle
+ * (footer, portada), no en los sitios donde hoy va `LogoMark` a tamaño
+ * pequeño (cabecera, panel admin, animación de entrada).
+ */
+export function LogoMascot({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/marca/kryvexa-mascota.png"
+      alt=""
+      width={364}
+      height={334}
+      aria-hidden
+      className={cx("h-24 w-auto object-contain", className)}
     />
   );
 }
