@@ -78,6 +78,32 @@ export const accountSchema = z
     path: ["newPassword"],
   });
 
+/**
+ * Recuperar contraseña sin sesión ("¿Olvidaste tu contraseña?" en el login).
+ *
+ * Dos pasos, dos esquemas: pedir el código (solo el correo) y confirmarlo
+ * (correo + código + contraseña nueva). No se pide la contraseña actual
+ * porque, precisamente, el usuario no la tiene.
+ */
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    email: emailSchema,
+    code: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{6}$/, "Ingresa el código de 6 dígitos"),
+    newPassword: passwordSchema,
+    confirmNewPassword: z.string(),
+  })
+  .refine((d) => d.newPassword === d.confirmNewPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmNewPassword"],
+  });
+
 /** Importes de depósito: entre S/ 5.00 y S/ 2000.00 */
 export const depositAmountSchema = z
   .number()

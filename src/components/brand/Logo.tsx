@@ -6,20 +6,29 @@ import { cx } from "@/components/ui";
  *
  * El logo real vive en `public/marca/` como PNG con fondo transparente, así
  * que se ve bien sobre cualquier fondo del tema (cabecera casi negra, panel
- * gris oscuro, pie). Para cambiarlo basta reemplazar esos dos archivos por
- * otros con el mismo nombre; no hay que tocar código:
+ * gris oscuro, pie). Para cambiarlo basta reemplazar esos archivos por otros
+ * con el mismo nombre; no hay que tocar código:
  *
- *   public/marca/kryvexa-marca.png → solo el símbolo (hexágono)
- *   public/marca/kryvexa-logo.png  → símbolo + nombre
+ *   public/marca/kryvexa-mascota.png → símbolo del hexágono CON la mascota
+ *                                       (el conejo). Es el logo en TODAS
+ *                                       partes: cabecera, footer, panel
+ *                                       admin, animación de entrada.
+ *   public/marca/kryvexa-marca.png   → solo el hexágono, sin la mascota.
+ *                                       Se conserva por si algún día se
+ *                                       necesita la versión sin el conejo,
+ *                                       pero ningún componente lo usa hoy.
+ *   public/marca/kryvexa-logo.png    → hexágono (sin mascota) + nombre
+ *                                       renderizado dentro de la imagen. Sin
+ *                                       uso actual, se conserva igual.
  */
 
 export function LogoMark({ className }: { className?: string }) {
   return (
     <Image
-      src="/marca/kryvexa-marca.png"
+      src="/marca/kryvexa-mascota.png"
       alt=""
-      width={167}
-      height={192}
+      width={334}
+      height={306}
       priority
       className={cx("size-9 w-auto object-contain", className)}
       aria-hidden

@@ -8,6 +8,13 @@
       "when": 1787100494582,
       "tag": "0000_clever_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787556211559,
+      "tag": "0001_confused_bastion",
+      "breakpoints": true
     }
   ]
 }

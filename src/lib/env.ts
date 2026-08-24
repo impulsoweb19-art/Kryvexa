@@ -51,6 +51,15 @@ const schema = z.object({
   STORAGE_DRIVER: z.enum(["local", "blob"]).default("local"),
   /** Token que Vercel inyecta solo cuando activas Blob Storage en el proyecto. */
   BLOB_READ_WRITE_TOKEN: z.string().default(""),
+
+  /**
+   * Envío de correo (hoy: código para "¿Olvidaste tu contraseña?"). Igual
+   * que CRON_SECRET: se declara opcional a propósito. Si falta, quien debe
+   * fallar es el envío del código, con un mensaje claro, no la web entera.
+   * Esa comprobación vive en `lib/email.ts`.
+   */
+  RESEND_API_KEY: z.string().default(""),
+  EMAIL_FROM: z.string().default("Kryvexa <no-reply@kryvexa.com>"),
 });
 
 /**

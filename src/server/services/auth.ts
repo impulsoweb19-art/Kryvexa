@@ -9,6 +9,7 @@ import { createSession, revokeAllSessions, type SessionUser } from "@/lib/sessio
 import { ensureWallet } from "./wallet";
 import { recordAudit } from "./audit";
 import { logger } from "@/lib/logger";
+import { requestVerificationCode, consumeVerificationCode } from "./verification";
 
 export interface RegisterServiceInput {
   name: string;
@@ -106,6 +107,11 @@ export async function loginUser(email: string, password: string): Promise<Sessio
  *  · El correo se guarda en minúsculas y se comprueba que no lo tenga otra
  *    cuenta. El índice único de la base lo garantiza igual, pero conviene dar
  *    un mensaje claro antes de que reviente.
+ *
+ * (No pide código de verificación por correo: `currentPassword` ya demuestra
+ * que quien cambia los datos es dueño de la sesión. Ese código sí se exige
+ * en `resetPassword`, más abajo, que es para cuando NO se tiene sesión ni
+ * contraseña.)
  */
 export async function updateOwnAccount(
   userId: string,
@@ -180,6 +186,68 @@ export async function updateOwnAccount(
     role: updated.role,
     status: updated.status,
   };
+}
+
+/**
+ * Paso 1 de "¿Olvidaste tu contraseña?": envía el código si el correo existe.
+ *
+ * Responde igual (éxito, sin detalles) exista o no la cuenta: decir "ese
+ * correo no está registrado" le regalaría a un atacante una forma de
+ * comprobar qué correos tienen cuenta en la tienda.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const normalized = email.toLowerCase().trim();
+
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${normalized}`)
+    .limit(1);
+
+  if (!user) return; // silencioso a propósito, ver arriba
+
+  await requestVerificationCode(user.id, user.email, "PASSWORD_RESET");
+}
+
+/**
+ * Paso 2: confirma el código y fija la contraseña nueva.
+ *
+ * Cierra todas las sesiones existentes (igual que un cambio de contraseña
+ * normal) pero NO abre una nueva: quien recupera la cuenta no tiene sesión
+ * previa que "conservar", así que entra por el login de siempre.
+ */
+export async function resetPassword(email: string, code: string, newPassword: string): Promise<void> {
+  const normalized = email.toLowerCase().trim();
+  const invalidCodeError = () =>
+    new AppError("VALIDATION_ERROR", {
+      userMessage: "El código de verificación no es válido o expiró.",
+      details: { fields: { code: "Código inválido o expirado." } },
+    });
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${normalized}`)
+    .limit(1);
+
+  // Mismo mensaje que un código incorrecto: no se revela si el correo existe.
+  if (!user) throw invalidCodeError();
+
+  await consumeVerificationCode(user.id, "PASSWORD_RESET", code);
+
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() })
+    .where(eq(users.id, user.id));
+
+  await revokeAllSessions(user.id);
+
+  await recordAudit({
+    actorId: user.id,
+    action: "user.password.reset",
+    entityType: "user",
+    entityId: user.id,
+  });
 }
 
 export async function setUserStatus(admin: SessionUser, userId: string, status: "ACTIVE" | "SUSPENDED") {
