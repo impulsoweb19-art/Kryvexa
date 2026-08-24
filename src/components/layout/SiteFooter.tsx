@@ -169,7 +169,10 @@ export async function SiteFooter() {
 
       <div className="border-t border-line-soft px-4 py-5 text-center text-xs text-faint sm:px-6">
         © {year} <span className="font-semibold text-flame-400">{name}</span> · Todos los derechos
-        reservados. Plataforma independiente, sin relación con Garena ni con sus marcas.
+        reservados. Plataforma independiente, sin relación con Garena ni con sus marcas. ·{" "}
+        <Link href="/terminos" className="underline hover:text-ink">
+          Términos y condiciones
+        </Link>
       </div>
     </footer>
   );

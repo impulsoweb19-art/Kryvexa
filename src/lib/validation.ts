@@ -68,6 +68,13 @@ export const accountSchema = z
     currentPassword: z.string().min(1, "Ingresa tu contraseña actual").max(72),
     newPassword: passwordSchema.optional().or(z.literal("").transform(() => undefined)),
     confirmNewPassword: z.string().optional(),
+    /** Solo obligatorio cuando se envía `newPassword`: ver el refine de abajo. */
+    verificationCode: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{6}$/, "Ingresa el código de 6 dígitos")
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
   })
   .refine((d) => !d.newPassword || d.newPassword === d.confirmNewPassword, {
     message: "Las contraseñas no coinciden",
@@ -76,6 +83,10 @@ export const accountSchema = z
   .refine((d) => !d.newPassword || d.newPassword !== d.currentPassword, {
     message: "La contraseña nueva debe ser distinta de la actual",
     path: ["newPassword"],
+  })
+  .refine((d) => !d.newPassword || Boolean(d.verificationCode), {
+    message: "Ingresa el código de verificación que enviamos a tu correo",
+    path: ["verificationCode"],
   });
 
 /** Importes de depósito: entre S/ 5.00 y S/ 2000.00 */

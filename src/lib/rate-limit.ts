@@ -25,6 +25,8 @@ export const RULES = {
   login: { action: "login", limit: 8, windowSec: 15 * 60 },
   /** Evita que se use el formulario de cuenta para adivinar la contraseña actual. */
   accountUpdate: { action: "account.update", limit: 10, windowSec: 15 * 60 },
+  /** Evita que se abuse del envío de códigos de verificación por correo. */
+  accountVerificationRequest: { action: "account.verification.request", limit: 5, windowSec: 15 * 60 },
   register: { action: "register", limit: 5, windowSec: 60 * 60 },
   depositCreate: { action: "deposit.create", limit: 10, windowSec: 60 * 60 },
   orderCreate: { action: "order.create", limit: 20, windowSec: 10 * 60 },

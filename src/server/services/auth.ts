@@ -9,6 +9,7 @@ import { createSession, revokeAllSessions, type SessionUser } from "@/lib/sessio
 import { ensureWallet } from "./wallet";
 import { recordAudit } from "./audit";
 import { logger } from "@/lib/logger";
+import { consumeVerificationCode } from "./verification";
 
 export interface RegisterServiceInput {
   name: string;
@@ -103,13 +104,23 @@ export async function loginUser(email: string, password: string): Promise<Sessio
  *  · Al cambiar la contraseña se cierran TODAS las demás sesiones y se abre
  *    una nueva para quien hizo el cambio. Así, si alguien te había robado la
  *    sesión, cambiar la contraseña lo echa de verdad.
+ *  · Si se cambia la contraseña, además se exige un código de verificación
+ *    enviado por correo (ver `server/services/verification.ts`): la
+ *    contraseña actual demuestra que la sesión es legítima, el código
+ *    demuestra que quien la cambia tiene acceso al correo de la cuenta.
  *  · El correo se guarda en minúsculas y se comprueba que no lo tenga otra
  *    cuenta. El índice único de la base lo garantiza igual, pero conviene dar
  *    un mensaje claro antes de que reviente.
  */
 export async function updateOwnAccount(
   userId: string,
-  input: { currentPassword: string; name?: string; email?: string; newPassword?: string },
+  input: {
+    currentPassword: string;
+    name?: string;
+    email?: string;
+    newPassword?: string;
+    verificationCode?: string;
+  },
 ): Promise<SessionUser> {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new AppError("UNAUTHENTICATED");
@@ -144,6 +155,15 @@ export async function updateOwnAccount(
   }
 
   const changingPassword = Boolean(input.newPassword);
+  if (changingPassword) {
+    if (!input.verificationCode) {
+      throw new AppError("VALIDATION_ERROR", {
+        userMessage: "Ingresa el código de verificación que enviamos a tu correo.",
+        details: { fields: { verificationCode: "Falta el código de verificación." } },
+      });
+    }
+    await consumeVerificationCode(userId, "ACCOUNT_UPDATE", input.verificationCode);
+  }
   if (input.newPassword) patch.passwordHash = await hashPassword(input.newPassword);
 
   if (!Object.keys(patch).length) {

@@ -2,9 +2,9 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SISTEMA DE DISEÑO
-   Oscuro, gaming, sobrio. Un solo acento cálido (llama) + un frío (plasma)
-   para estados y datos. Nada de degradados por todas partes: el color se gana
-   el sitio marcando lo accionable.
+   Oscuro, gaming, sobrio. Un acento principal celeste + un frío secundario
+   (plasma) para estados y datos. Nada de degradados por todas partes: el
+   color se gana el sitio marcando lo accionable.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
@@ -19,9 +19,9 @@
   --color-muted: #9aa3b8;
   --color-faint: #646e85;
 
-  --color-flame-400: #ff9d3d;
-  --color-flame-500: #ff7a18;
-  --color-flame-600: #e85d02;
+  --color-flame-400: #6ec6ff;
+  --color-flame-500: #2f9bf0;
+  --color-flame-600: #1276c4;
 
   --color-plasma-400: #4fd8ff;
   --color-plasma-500: #16b6e8;
@@ -34,7 +34,7 @@
 
   --radius-card: 16px;
 
-  --shadow-glow: 0 0 0 1px rgb(255 122 24 / 0.25), 0 12px 40px -12px rgb(255 122 24 / 0.45);
+  --shadow-glow: 0 0 0 1px rgb(47 155 240 / 0.25), 0 12px 40px -12px rgb(47 155 240 / 0.45);
   --shadow-panel: 0 24px 60px -32px rgb(0 0 0 / 0.9);
 }
 
@@ -65,7 +65,7 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(60rem 40rem at 15% -10%, rgb(255 122 24 / 0.10), transparent 60%),
+    radial-gradient(60rem 40rem at 15% -10%, rgb(47 155 240 / 0.10), transparent 60%),
     radial-gradient(50rem 35rem at 95% 0%, rgb(22 182 232 / 0.08), transparent 60%);
 }
 
@@ -76,7 +76,7 @@ body::before {
 }
 
 ::selection {
-  background: rgb(255 122 24 / 0.35);
+  background: rgb(47 155 240 / 0.35);
 }
 
 /* Scrollbar discreta y coherente con el tema. */
@@ -99,7 +99,7 @@ body::before {
 }
 
 @utility text-gradient-flame {
-  background: linear-gradient(100deg, var(--color-flame-400), #ffd08a 55%, var(--color-plasma-400));
+  background: linear-gradient(100deg, var(--color-flame-400), #bfe6ff 55%, var(--color-plasma-400));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

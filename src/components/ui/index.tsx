@@ -19,7 +19,7 @@ type ButtonSize = "sm" | "md" | "lg";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    "bg-linear-to-r from-flame-500 to-flame-400 text-void font-semibold hover:from-flame-400 hover:to-flame-400 shadow-[0_10px_30px_-12px_rgb(255_122_24_/_0.8)]",
+    "bg-linear-to-r from-flame-500 to-flame-400 text-void font-semibold hover:from-flame-400 hover:to-flame-400 shadow-[0_10px_30px_-12px_rgb(47_155_240_/_0.8)]",
   secondary: "bg-surface-2 text-ink border border-line hover:border-flame-500/60 hover:bg-surface",
   ghost: "text-muted hover:text-ink hover:bg-surface-2",
   danger: "bg-danger/10 text-danger border border-danger/40 hover:bg-danger/20",

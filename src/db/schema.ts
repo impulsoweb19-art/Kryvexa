@@ -38,6 +38,7 @@ export const txReasonEnum = pgEnum("tx_reason", [
   "ADMIN_ADJUSTMENT",
 ]);
 export const depositStatusEnum = pgEnum("deposit_status", ["PENDING", "APPROVED", "REJECTED"]);
+export const verificationPurposeEnum = pgEnum("verification_purpose", ["ACCOUNT_UPDATE"]);
 export const productKindEnum = pgEnum("product_kind", [
   "GAME_PACKAGE", // /products/games  → /buy/games
   "PIN", // /products/pins (type=pin)      → /buy/pins {quantity}
@@ -104,6 +105,32 @@ export const sessions = pgTable(
     uniqueIndex("sessions_token_hash_key").on(t.tokenHash),
     index("sessions_user_id_idx").on(t.userId),
     index("sessions_expires_at_idx").on(t.expiresAt),
+  ],
+);
+
+/**
+ * Códigos de un solo uso enviados por correo (hoy: confirmar cambio de
+ * contraseña desde "Mi cuenta"). Se guarda el hash, no el código en claro,
+ * igual que con `sessions.tokenHash`: si roban la base, no obtienen códigos
+ * utilizables.
+ */
+export const verificationCodes = pgTable(
+  "verification_codes",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    purpose: verificationPurposeEnum("purpose").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("verification_codes_user_purpose_idx").on(t.userId, t.purpose),
+    index("verification_codes_expires_idx").on(t.expiresAt),
   ],
 );
 
@@ -392,3 +419,5 @@ export type Order = typeof orders.$inferSelect;
 export type OrderStatus = (typeof orderStatusEnum.enumValues)[number];
 export type ProductKind = (typeof productKindEnum.enumValues)[number];
 export type DepositStatus = (typeof depositStatusEnum.enumValues)[number];
+export type VerificationCode = typeof verificationCodes.$inferSelect;
+export type VerificationPurpose = (typeof verificationPurposeEnum.enumValues)[number];
