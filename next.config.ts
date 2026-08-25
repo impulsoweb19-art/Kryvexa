@@ -41,7 +41,9 @@ const nextConfig: NextConfig = {
               // Next inyecta estilos y scripts inline en el runtime del App Router.
               scriptSrc,
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              // https://*.public.blob.vercel-storage.com: imágenes de productos y QR
+              // subidas por el admin, servidas directo desde Vercel Blob (STORAGE_DRIVER=blob).
+              "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
               "font-src 'self' data:",
               connectSrc,
               "frame-ancestors 'none'",
