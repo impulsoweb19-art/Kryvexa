@@ -19,6 +19,7 @@ export interface AdminProductRow {
   validationSupported: boolean;
   inputLabels: string[];
   hasImage: boolean;
+  imageUrl: string;
 }
 
 export function CatalogManager({
@@ -168,11 +169,7 @@ export function CatalogManager({
                   <div className="flex shrink-0 items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={
-                        p.hasImage
-                          ? `/api/products/${p.id}/image?v=${imageVersions[p.id] ?? 0}`
-                          : "/juegos/free-fire.jpg"
-                      }
+                      src={`${p.imageUrl}${p.imageUrl.includes("?") ? "&" : "?"}v=${imageVersions[p.id] ?? 0}`}
                       alt=""
                       className="size-14 shrink-0 rounded-lg border border-line-soft bg-surface-2 object-cover"
                     />

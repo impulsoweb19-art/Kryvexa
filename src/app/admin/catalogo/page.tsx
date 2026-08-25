@@ -1,5 +1,5 @@
 import { CatalogManager, type AdminProductRow } from "@/components/admin/CatalogManager";
-import { listAllProducts, sellPriceCents } from "@/server/services/catalog";
+import { listAllProducts, productImageUrl, sellPriceCents } from "@/server/services/catalog";
 import { getConfig } from "@/server/services/settings";
 import type { ProviderInputField } from "@/server/providers/types";
 
@@ -29,6 +29,7 @@ export default async function AdminCatalogPage() {
     validationSupported: p.validationSupported,
     inputLabels: ((p.inputFields as ProviderInputField[]) ?? []).map((f) => f.label),
     hasImage: Boolean(p.imagePath),
+    imageUrl: productImageUrl(p),
   }));
 
   const lastSync = products

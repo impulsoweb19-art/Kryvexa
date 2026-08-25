@@ -38,13 +38,22 @@ export interface StoreProduct {
 }
 
 /**
- * URL de la imagen de un producto: la que subió el admin (servida por
- * /api/products/[id]/image, con sesión) o, a falta de esa, la portada
- * genérica del juego. Solo Free Fire en la v1, así que un único fallback
- * basta; con más juegos habría que mapear por `gameName`.
+ * URL de la imagen de un producto: la que subió el admin, o a falta de esa,
+ * la portada genérica del juego. Solo Free Fire en la v1, así que un único
+ * fallback basta; con más juegos habría que mapear por `gameName`.
+ *
+ * Con STORAGE_DRIVER=blob, `imagePath` ya es la URL pública de Vercel Blob:
+ * se usa tal cual, directo al CDN de Blob. Antes se hacía pasar SIEMPRE por
+ * /api/products/[id]/image (pensado para el driver "local", donde el
+ * archivo no es servible como estático), pero eso obligaba a una función
+ * de Next a re-descargar y reenviar cada imagen del blob — con varias
+ * imágenes cargando a la vez en la tienda, esa función fallaba de forma
+ * intermitente. Ir directo al CDN es más rápido y no depende de esa función.
  */
 export function productImageUrl(product: Pick<Product, "id" | "imagePath">): string {
-  return product.imagePath ? `/api/products/${product.id}/image` : "/juegos/free-fire.jpg";
+  if (!product.imagePath) return "/juegos/free-fire.jpg";
+  if (/^https?:\/\//i.test(product.imagePath)) return product.imagePath;
+  return `/api/products/${product.id}/image`;
 }
 
 /** Precio final en céntimos de PEN. Respeta el precio fijo del admin si existe. */
