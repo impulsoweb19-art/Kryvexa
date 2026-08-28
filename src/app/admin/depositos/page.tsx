@@ -20,6 +20,7 @@ const dateFmt = new Intl.DateTimeFormat("es-PE", {
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "America/Lima",
 });
 
 export default async function AdminDepositsPage({

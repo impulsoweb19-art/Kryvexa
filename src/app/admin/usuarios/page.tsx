@@ -6,7 +6,12 @@ import { listUsersForAdmin } from "@/server/services/stats";
 
 export const dynamic = "force-dynamic";
 
-const dateFmt = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short", year: "numeric" });
+const dateFmt = new Intl.DateTimeFormat("es-PE", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  timeZone: "America/Lima",
+});
 
 export default async function AdminUsersPage({
   searchParams,

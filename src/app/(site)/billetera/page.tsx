@@ -21,6 +21,7 @@ const dateFmt = new Intl.DateTimeFormat("es-PE", {
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "America/Lima",
 });
 
 export default async function WalletPage() {

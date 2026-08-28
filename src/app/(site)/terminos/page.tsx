@@ -14,7 +14,12 @@ export const dynamic = "force-dynamic";
 export default async function TermsPage() {
   const config = await getConfig();
   const name = config.storeName || "Kryvexa";
-  const updated = new Date().toLocaleDateString("es-PE", { year: "numeric", month: "long", day: "numeric" });
+  const updated = new Date().toLocaleDateString("es-PE", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "America/Lima",
+  });
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
