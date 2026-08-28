@@ -45,13 +45,13 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: storeName,
       type: "website",
       locale: "es_PE",
-      images: [{ url: "/marca/kryvexa-logo.png", width: 418, height: 256, alt: storeName }],
+      images: [{ url: "/marca/kryvexa-mascota.png", width: 334, height: 306, alt: storeName }],
     },
     twitter: {
       card: "summary",
       title,
       description,
-      images: ["/marca/kryvexa-logo.png"],
+      images: ["/marca/kryvexa-mascota.png"],
     },
   };
 }
