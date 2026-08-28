@@ -45,13 +45,15 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: storeName,
       type: "website",
       locale: "es_PE",
-      images: [{ url: "/marca/kryvexa-mascota.png", width: 334, height: 306, alt: storeName }],
+      // Versión con fondo sólido: la original es transparente, y WhatsApp/Telegram
+      // la componen sobre blanco en vez del fondo oscuro del sitio.
+      images: [{ url: "/marca/kryvexa-mascota-og.png", width: 334, height: 306, alt: storeName }],
     },
     twitter: {
       card: "summary",
       title,
       description,
-      images: ["/marca/kryvexa-mascota.png"],
+      images: ["/marca/kryvexa-mascota-og.png"],
     },
   };
 }
