@@ -23,18 +23,36 @@ export async function generateMetadata(): Promise<Metadata> {
     /* se usa el valor por defecto */
   }
 
+  const title = `${storeName} | Todo lo que necesitas, en un solo lugar`;
+  const description =
+    "Recargas de juegos al instante: diamantes, pases y membresías de Free Fire. Cargas saldo por Yape y compras cuando quieras, con entrega inmediata.";
+
   return {
     // `baseUrl()` tolera una APP_URL mal escrita (por ejemplo sin https://) en
     // vez de lanzar un error que impediría generar las páginas.
     metadataBase: baseUrl(),
     title: {
-      default: `${storeName} | Todo lo que necesitas, en un solo lugar`,
+      default: title,
       template: `%s · ${storeName}`,
     },
-    description:
-      "Recargas de juegos al instante: diamantes, pases y membresías de Free Fire. Cargas saldo por Yape y compras cuando quieras, con entrega inmediata.",
+    description,
     robots: { index: true, follow: true },
     applicationName: storeName,
+    // Sin esto, WhatsApp/Telegram/Facebook muestran el link sin imagen al compartirlo.
+    openGraph: {
+      title,
+      description,
+      siteName: storeName,
+      type: "website",
+      locale: "es_PE",
+      images: [{ url: "/marca/kryvexa-logo.png", width: 418, height: 256, alt: storeName }],
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: ["/marca/kryvexa-logo.png"],
+    },
   };
 }
 
