@@ -185,10 +185,32 @@ async function main() {
     { name: "input2", label: "Server ID" },
   ];
 
-  const manualProducts = [
+  // Cajas y Fragmentos Evo se entregan solo con el ID de jugador (sin Server ID).
+  const EVO_INPUTS = [{ name: "input1", label: "Player ID" }];
+
+  const manualProducts: Array<{
+    externalId: string;
+    packageName: string;
+    costSoles: number;
+    /** Si se define, fija el precio de venta exacto en vez de calcularlo por margen. */
+    priceSoles?: number;
+    inputs?: typeof MANUAL_INPUTS;
+  }> = [
     { externalId: "manual-pase-booyah", packageName: "Pase Booyah", costSoles: 3.0 },
     { externalId: "manual-membresia-semanal", packageName: "Membresía Semanal", costSoles: 6.5 },
     { externalId: "manual-membresia-mensual", packageName: "Membresía Mensual", costSoles: 28.9 },
+    // Precios de venta fijos según la lista de precios del negocio (cajas y
+    // fragmentos, sin las demás secciones de esa lista que no son de este catálogo).
+    { externalId: "manual-cajas-evo-20", packageName: "20 Cajas Evo", costSoles: 14.0, priceSoles: 17.5, inputs: EVO_INPUTS },
+    { externalId: "manual-cajas-evo-30", packageName: "30 Cajas Evo", costSoles: 22.0, priceSoles: 27.5, inputs: EVO_INPUTS },
+    { externalId: "manual-cajas-evo-60", packageName: "60 Cajas Evo", costSoles: 36.0, priceSoles: 45.0, inputs: EVO_INPUTS },
+    { externalId: "manual-cajas-evo-120", packageName: "120 Cajas Evo", costSoles: 56.8, priceSoles: 71.0, inputs: EVO_INPUTS },
+    { externalId: "manual-cajas-evo-240", packageName: "240 Cajas Evo", costSoles: 110.4, priceSoles: 138.0, inputs: EVO_INPUTS },
+    { externalId: "manual-fragmentos-evo-99", packageName: "99 Fragmentos Evo", costSoles: 14.0, priceSoles: 17.5, inputs: EVO_INPUTS },
+    { externalId: "manual-fragmentos-evo-150", packageName: "150 Fragmentos Evo", costSoles: 22.0, priceSoles: 27.5, inputs: EVO_INPUTS },
+    { externalId: "manual-fragmentos-evo-300", packageName: "300 Fragmentos Evo", costSoles: 36.0, priceSoles: 45.0, inputs: EVO_INPUTS },
+    { externalId: "manual-fragmentos-evo-600", packageName: "600 Fragmentos Evo", costSoles: 56.8, priceSoles: 71.0, inputs: EVO_INPUTS },
+    { externalId: "manual-fragmentos-evo-1200", packageName: "1200 Fragmentos Evo", costSoles: 110.4, priceSoles: 138.0, inputs: EVO_INPUTS },
   ];
 
   for (const item of manualProducts) {
@@ -197,6 +219,7 @@ async function main() {
     // precios automáticos del panel funcione igual que con los demás
     // productos. El administrador puede fijar el precio que quiera después.
     const costUsdCents = Math.round((item.costSoles / 3.8) * 100);
+    const priceCents = item.priceSoles != null ? Math.round(item.priceSoles * 100) : null;
 
     await db
       .insert(schema.products)
@@ -207,7 +230,8 @@ async function main() {
         gameName: "Free Fire — Entrega manual",
         packageName: item.packageName,
         costUsdCents,
-        inputFields: sql`${JSON.stringify(MANUAL_INPUTS)}::jsonb`,
+        priceCents,
+        inputFields: sql`${JSON.stringify(item.inputs ?? MANUAL_INPUTS)}::jsonb`,
         validationSupported: false,
         sortOrder: Math.min(9999, Math.round(costUsdCents / 100)),
         lastSyncedAt: new Date(),
