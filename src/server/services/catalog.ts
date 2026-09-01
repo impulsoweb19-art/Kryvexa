@@ -294,6 +294,16 @@ export async function updateProductOverride(
   return updated;
 }
 
+/** Mostrar/ocultar varios productos a la vez (botón "Seleccionar todos" del catálogo). */
+export async function bulkSetVisibility(productIds: string[], visible: boolean): Promise<number> {
+  const updated = await db
+    .update(products)
+    .set({ visible, updatedAt: new Date() })
+    .where(inArray(products.id, productIds))
+    .returning({ id: products.id });
+  return updated.length;
+}
+
 /** Fija la imagen subida por el admin para un paquete. */
 export async function setProductImage(productId: string, imagePath: string): Promise<Product> {
   const [updated] = await db

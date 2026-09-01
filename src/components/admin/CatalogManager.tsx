@@ -60,6 +60,51 @@ export function CatalogManager({
   // Cambia por producto al subir/quitar una imagen, para forzar que el
   // navegador la vuelva a pedir en vez de mostrar la que tenía en caché.
   const [imageVersions, setImageVersions] = useState<Record<string, number>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  function changeTab(tab: (typeof GAME_TABS)[number]["key"]) {
+    setGameTab(tab);
+    setSelected(new Set()); // la selección no cruza de una pestaña a otra
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allSelected = visibleProducts.length > 0 && visibleProducts.every((p) => selected.has(p.id));
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(visibleProducts.map((p) => p.id)));
+  }
+
+  async function bulkSetVisible(visible: boolean) {
+    setBulkBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/catalog", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productIds: [...selected], visible }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error ?? "No se pudo actualizar en lote.");
+      setMessage({
+        tone: "ok",
+        text: `${json.data.updatedCount} producto(s) marcados como ${visible ? "visibles" : "no visibles"}.`,
+      });
+      setSelected(new Set());
+      router.refresh();
+    } catch (e) {
+      setMessage({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   async function sync() {
     setSyncing(true);
@@ -181,7 +226,7 @@ export function CatalogManager({
             <button
               key={tab.key}
               type="button"
-              onClick={() => setGameTab(tab.key)}
+              onClick={() => changeTab(tab.key)}
               className={cx(
                 "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
                 gameTab === tab.key
@@ -202,11 +247,42 @@ export function CatalogManager({
       ) : visibleProducts.length === 0 ? (
         <Card className="text-sm text-muted">No hay productos de este juego todavía.</Card>
       ) : (
-        <div className="space-y-2">
+        <>
+          <Card className="flex flex-wrap items-center gap-4 py-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="size-4 accent-flame-500"
+              />
+              Seleccionar todos ({visibleProducts.length})
+            </label>
+
+            {selected.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted">{selected.size} seleccionado(s)</span>
+                <Button size="sm" variant="secondary" loading={bulkBusy} onClick={() => bulkSetVisible(true)}>
+                  Marcar visibles
+                </Button>
+                <Button size="sm" variant="secondary" loading={bulkBusy} onClick={() => bulkSetVisible(false)}>
+                  Marcar no visibles
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          <div className="space-y-2">
           {visibleProducts.map((p) => (
             <Card key={p.id} className={cx("py-4", !p.active && "opacity-60")}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.id)}
+                    onChange={() => toggleOne(p.id)}
+                    className="size-4 shrink-0 accent-flame-500"
+                  />
                   <div className="flex shrink-0 items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -310,7 +386,8 @@ export function CatalogManager({
               </div>
             </Card>
           ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

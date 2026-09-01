@@ -170,6 +170,12 @@ export const productOverrideSchema = z.object({
   marginBps: z.number().int().min(0).max(20_000).nullable().optional(),
 });
 
+/** Mostrar/ocultar varios productos de una sola vez (ver el botón "Seleccionar todos" del catálogo). */
+export const bulkVisibilitySchema = z.object({
+  productIds: z.array(z.string().min(1)).min(1).max(2000),
+  visible: z.boolean(),
+});
+
 export type AccountInput = z.infer<typeof accountSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
