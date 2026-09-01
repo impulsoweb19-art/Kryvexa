@@ -7,6 +7,7 @@ import { formatPEN, formatUSD } from "@/lib/money";
 
 export interface AdminProductRow {
   id: string;
+  providerCode: string;
   gameName: string;
   packageName: string;
   kind: string;
@@ -22,6 +23,20 @@ export interface AdminProductRow {
   imageUrl: string;
 }
 
+/**
+ * Mismo criterio que `isFreeFireProduct`/`isMobileLegendsProduct` en
+ * `server/services/catalog.ts`: por proveedor cuando es exclusivo de un
+ * juego (confiable), y por `gameName` solo para "manual" (que sí puede
+ * tener productos de varios juegos). No se importa desde ahí porque ese
+ * archivo es server-only y este componente corre en el navegador.
+ */
+const GAME_TABS = [
+  { key: "free-fire", label: "Free Fire", match: (p: AdminProductRow) =>
+      p.providerCode === "recargas_america" || (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName)) },
+  { key: "mobile-legends", label: "Mobile Legends", match: (p: AdminProductRow) =>
+      p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile?\s*legends/i.test(p.gameName)) },
+] as const;
+
 export function CatalogManager({
   products,
   exchangeRate,
@@ -34,6 +49,9 @@ export function CatalogManager({
   lastSync: string | null;
 }) {
   const router = useRouter();
+  const [gameTab, setGameTab] = useState<(typeof GAME_TABS)[number]["key"]>("free-fire");
+  const activeMatch = GAME_TABS.find((t) => t.key === gameTab)!.match;
+  const visibleProducts = products.filter(activeMatch);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -156,13 +174,36 @@ export function CatalogManager({
         </p>
       </Card>
 
+      <div className="flex flex-wrap gap-2">
+        {GAME_TABS.map((tab) => {
+          const count = products.filter(tab.match).length;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setGameTab(tab.key)}
+              className={cx(
+                "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
+                gameTab === tab.key
+                  ? "border-flame-500 bg-flame-500/10 text-flame-400"
+                  : "border-line bg-abyss text-muted hover:border-line hover:text-ink",
+              )}
+            >
+              {tab.label} <span className="tabular-nums opacity-70">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
       {products.length === 0 ? (
         <Card className="text-sm text-muted">
           No hay productos todavía. Pulsa «Sincronizar ahora».
         </Card>
+      ) : visibleProducts.length === 0 ? (
+        <Card className="text-sm text-muted">No hay productos de este juego todavía.</Card>
       ) : (
         <div className="space-y-2">
-          {products.map((p) => (
+          {visibleProducts.map((p) => (
             <Card key={p.id} className={cx("py-4", !p.active && "opacity-60")}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 flex-1 items-center gap-4">

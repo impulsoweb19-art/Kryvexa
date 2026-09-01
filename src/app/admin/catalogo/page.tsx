@@ -18,6 +18,7 @@ export default async function AdminCatalogPage() {
 
   const rows: AdminProductRow[] = products.map((p) => ({
     id: p.id,
+    providerCode: p.providerCode,
     gameName: p.gameName,
     packageName: p.packageName,
     kind: p.kind,
@@ -43,7 +44,7 @@ export default async function AdminCatalogPage() {
       <div>
         <h1 className="text-2xl font-bold">Catálogo</h1>
         <p className="mt-1 text-sm text-muted">
-          Productos traídos del proveedor. Solo se importan los de Free Fire en esta versión.
+          Productos traídos de los proveedores (Free Fire y Mobile Legends).
         </p>
       </div>
 
