@@ -9,17 +9,17 @@ import { getBalance } from "@/server/services/wallet";
 export const metadata: Metadata = { title: "Mobile Legends" };
 export const dynamic = "force-dynamic";
 
-const MOBILE_LEGENDS_FILTER = /mobile\s*legends/i;
-
 /**
  * Igual que /tienda pero para Mobile Legends — página aparte (no una sección
  * más de /tienda) para no mezclar los dos juegos en la misma pantalla ni
- * tocar en nada el flujo de Free Fire que ya existía.
+ * tocar en nada el flujo de Free Fire que ya existía. Se filtra por
+ * proveedor (epinby), no por el nombre del juego — ver el comentario en
+ * `listStoreProducts`.
  */
 export default async function MobileLegendsStorePage() {
   const user = await requireUserPage("/tienda/mobile-legends");
   const [products, balance] = await Promise.all([
-    listStoreProducts(MOBILE_LEGENDS_FILTER).catch(() => []),
+    listStoreProducts("epinby").catch(() => []),
     getBalance(user.id),
   ]);
 

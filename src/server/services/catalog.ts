@@ -97,20 +97,30 @@ export function toStoreProduct(product: Product, config: StoreConfig): StoreProd
 }
 
 /**
- * @param gameFilter Si se pasa, solo devuelve productos cuyo `gameName` haga
- * match (p. ej. la página de un juego concreto). Sin filtro, devuelve todo lo
+ * @param providerCode Si se pasa, solo devuelve productos de ESE proveedor
+ * (p. ej. la página de un juego concreto). Sin filtro, devuelve todo lo
  * visible — lo usa la portada para el contador general de paquetes.
+ *
+ * Se filtra por `providerCode`, NO por `gameName`: el nombre del juego es
+ * texto libre que a veces sale mal armado (ver `guessGameName` en el mapper
+ * de RecargasAmérica, que puede producir cosas como "Recarga Free" en vez de
+ * "Free Fire" si el nombre del producto no calza con el patrón esperado).
+ * Cada proveedor de la v1 sirve un solo juego, así que providerCode identifica
+ * el juego de forma confiable aunque el texto de gameName no sea prolijo.
  */
-export async function listStoreProducts(gameFilter?: RegExp): Promise<StoreProduct[]> {
+export async function listStoreProducts(providerCode?: string): Promise<StoreProduct[]> {
   const config = await getConfig();
   const rows = await db
     .select()
     .from(products)
-    .where(and(eq(products.visible, true), eq(products.active, true)))
+    .where(
+      providerCode
+        ? and(eq(products.visible, true), eq(products.active, true), eq(products.providerCode, providerCode))
+        : and(eq(products.visible, true), eq(products.active, true)),
+    )
     .orderBy(asc(products.sortOrder), asc(products.costUsdCents));
 
-  const filtered = gameFilter ? rows.filter((p) => gameFilter.test(p.gameName)) : rows;
-  return filtered.map((p) => toStoreProduct(p, config));
+  return rows.map((p) => toStoreProduct(p, config));
 }
 
 export async function listAllProducts(): Promise<Product[]> {
