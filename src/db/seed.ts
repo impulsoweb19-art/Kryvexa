@@ -69,6 +69,17 @@ async function main() {
     })
     .onConflictDoNothing({ target: schema.providers.code });
 
+  await db
+    .insert(schema.providers)
+    .values({
+      code: "epinby",
+      name: "EpinBy",
+      baseUrl: process.env.EPINBY_BASE_URL ?? "https://epinby.com/api/v1",
+      enabled: true,
+      notes: "Mobile Legends.",
+    })
+    .onConflictDoNothing({ target: schema.providers.code });
+
   // ── Configuración ─────────────────────────────────────────────────────────
   const settingsToSeed: Record<string, unknown> = { ...DEFAULT_SETTINGS };
 

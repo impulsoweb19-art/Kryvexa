@@ -6,7 +6,7 @@ import { products, type Product } from "@/db/schema";
 import { computeSellPriceCents } from "@/lib/money";
 import { logger } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
-import { getProvider, DEFAULT_PROVIDER } from "@/server/providers/registry";
+import { getProvider, SYNCABLE_PROVIDERS } from "@/server/providers/registry";
 import type { ProviderInputField } from "@/server/providers/types";
 import { getConfig, type StoreConfig } from "./settings";
 
@@ -21,8 +21,15 @@ import { getConfig, type StoreConfig } from "./settings";
  * proveedor, el tipo de cambio y el margen. El navegador nunca decide precios.
  */
 
-/** Solo Free Fire en la v1 (punto 1 del brief). */
-const V1_GAME_FILTER = /free\s*fire/i;
+/**
+ * Un juego por proveedor (Free Fire en RecargasAmérica, Mobile Legends en
+ * EpinBy). Cada proveedor puede traer catálogos de varios juegos; esto
+ * decide cuál de ellos entra a la tienda.
+ */
+const GAME_FILTERS: Record<string, RegExp> = {
+  recargas_america: /free\s*fire/i,
+  epinby: /mobile\s*legends/i,
+};
 
 export interface StoreProduct {
   id: string;
@@ -50,8 +57,19 @@ export interface StoreProduct {
  * imágenes cargando a la vez en la tienda, esa función fallaba de forma
  * intermitente. Ir directo al CDN es más rápido y no depende de esa función.
  */
-export function productImageUrl(product: Pick<Product, "id" | "imagePath">): string {
-  if (!product.imagePath) return "/juegos/free-fire.jpg";
+/** Portada genérica por juego, para cuando el admin no subió imagen propia. */
+const GAME_FALLBACK_IMAGES: Array<[RegExp, string]> = [
+  [/free\s*fire/i, "/juegos/free-fire.jpg"],
+  [/mobile\s*legends/i, "/juegos/mobile-legends.jpg"],
+];
+
+function fallbackImageForGame(gameName: string): string {
+  const match = GAME_FALLBACK_IMAGES.find(([re]) => re.test(gameName));
+  return match ? match[1] : "/juegos/free-fire.jpg";
+}
+
+export function productImageUrl(product: Pick<Product, "id" | "imagePath" | "gameName">): string {
+  if (!product.imagePath) return fallbackImageForGame(product.gameName);
   if (/^https?:\/\//i.test(product.imagePath)) return product.imagePath;
   return `/api/products/${product.id}/image`;
 }
@@ -78,7 +96,12 @@ export function toStoreProduct(product: Product, config: StoreConfig): StoreProd
   };
 }
 
-export async function listStoreProducts(): Promise<StoreProduct[]> {
+/**
+ * @param gameFilter Si se pasa, solo devuelve productos cuyo `gameName` haga
+ * match (p. ej. la página de un juego concreto). Sin filtro, devuelve todo lo
+ * visible — lo usa la portada para el contador general de paquetes.
+ */
+export async function listStoreProducts(gameFilter?: RegExp): Promise<StoreProduct[]> {
   const config = await getConfig();
   const rows = await db
     .select()
@@ -86,7 +109,8 @@ export async function listStoreProducts(): Promise<StoreProduct[]> {
     .where(and(eq(products.visible, true), eq(products.active, true)))
     .orderBy(asc(products.sortOrder), asc(products.costUsdCents));
 
-  return rows.map((p) => toStoreProduct(p, config));
+  const filtered = gameFilter ? rows.filter((p) => gameFilter.test(p.gameName)) : rows;
+  return filtered.map((p) => toStoreProduct(p, config));
 }
 
 export async function listAllProducts(): Promise<Product[]> {
@@ -122,13 +146,13 @@ export interface SyncResult {
 }
 
 /**
- * Sincroniza el catálogo del proveedor con la tabla local.
+ * Sincroniza el catálogo de UN proveedor con la tabla local.
  *
  * Conserva SIEMPRE las decisiones del administrador (visible, featured,
  * sortOrder, precio fijo, margen propio): del proveedor solo se refrescan el
  * nombre, el costo y los input_fields.
  */
-export async function syncCatalog(providerCode = DEFAULT_PROVIDER): Promise<SyncResult> {
+async function syncCatalogForProvider(providerCode: string): Promise<SyncResult> {
   const provider = getProvider(providerCode);
   if (!provider.isConfigured()) {
     throw new AppError("PROVIDER_NOT_CONFIGURED", {
@@ -139,7 +163,10 @@ export async function syncCatalog(providerCode = DEFAULT_PROVIDER): Promise<Sync
   const fetched = await provider.listProducts();
   const result: SyncResult = { fetched: fetched.length, created: 0, updated: 0, deactivated: 0, skipped: 0 };
 
-  const relevant = fetched.filter((p) => V1_GAME_FILTER.test(`${p.gameName} ${p.packageName}`));
+  // Sin filtro registrado, no se importa nada de ese proveedor (mejor omitir
+  // que importar un juego que nadie pidió).
+  const gameFilter = GAME_FILTERS[providerCode] ?? /(?!)/;
+  const relevant = fetched.filter((p) => gameFilter.test(`${p.gameName} ${p.packageName}`));
   result.skipped = fetched.length - relevant.length;
 
   const existing = await db.select().from(products).where(eq(products.providerCode, providerCode));
@@ -201,6 +228,37 @@ export async function syncCatalog(providerCode = DEFAULT_PROVIDER): Promise<Sync
 
   logger.info("Catálogo sincronizado", { providerCode, ...result });
   return result;
+}
+
+/**
+ * Sincroniza el catálogo. Sin argumento, recorre TODOS los proveedores con
+ * catálogo propio (`SYNCABLE_PROVIDERS`) y suma los resultados — así el botón
+ * «Sincronizar ahora» y el cron siguen llamando esto igual que antes, pero
+ * ahora cubre RecargasAmérica y EpinBy en una sola pasada.
+ *
+ * Si un proveedor falla (p. ej. le falta la API key), no tumba a los demás:
+ * el error queda registrado y el resumen refleja solo lo que sí se sincronizó.
+ */
+export async function syncCatalog(providerCode?: string): Promise<SyncResult> {
+  if (providerCode) return syncCatalogForProvider(providerCode);
+
+  const totals: SyncResult = { fetched: 0, created: 0, updated: 0, deactivated: 0, skipped: 0 };
+  for (const code of SYNCABLE_PROVIDERS) {
+    try {
+      const partial = await syncCatalogForProvider(code);
+      totals.fetched += partial.fetched;
+      totals.created += partial.created;
+      totals.updated += partial.updated;
+      totals.deactivated += partial.deactivated;
+      totals.skipped += partial.skipped;
+    } catch (e) {
+      logger.warn("No se pudo sincronizar un proveedor; se continúa con los demás", {
+        providerCode: code,
+        error: (e as Error).message,
+      });
+    }
+  }
+  return totals;
 }
 
 export async function updateProductOverride(

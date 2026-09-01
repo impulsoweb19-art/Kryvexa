@@ -103,6 +103,40 @@ export interface ProviderHealth {
   message: string | null;
 }
 
+/** Distingue "no se pudo preguntar" de "el proveedor dijo que no". */
+export type FailureKind =
+  | "NETWORK" // no hubo respuesta → resultado DESCONOCIDO
+  | "TIMEOUT" // no hubo respuesta a tiempo → resultado DESCONOCIDO
+  | "HTTP" // el proveedor respondió con error → resultado conocido
+  | "BUSINESS" // 200 con success:false → resultado conocido
+  | "MALFORMED"; // respuesta ilegible → resultado DESCONOCIDO
+
+/**
+ * Común a todos los proveedores (antes vivía solo en recargas-america/client.ts,
+ * pero `orders.ts` la usa para clasificar el fallo de CUALQUIER proveedor).
+ */
+export class ProviderRequestError extends Error {
+  constructor(
+    readonly kind: FailureKind,
+    message: string,
+    readonly httpStatus: number | null = null,
+    readonly providerCode: string | null = null,
+    readonly raw: unknown = null,
+  ) {
+    super(message);
+    this.name = "ProviderRequestError";
+  }
+
+  /**
+   * true si NO podemos afirmar que la operación no ocurrió.
+   * En una compra, esto obliga a dejar la orden en PENDING en lugar de
+   * reembolsar a ciegas (podría haberse ejecutado del otro lado).
+   */
+  get resultUnknown(): boolean {
+    return this.kind === "NETWORK" || this.kind === "TIMEOUT" || this.kind === "MALFORMED";
+  }
+}
+
 export interface ProviderAdapter {
   readonly code: string;
   readonly name: string;

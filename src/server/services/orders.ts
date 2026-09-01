@@ -11,7 +11,7 @@ import { getPurchasableProduct, sellPriceCents } from "./catalog";
 import { recordAudit } from "./audit";
 import { getProvider } from "@/server/providers/registry";
 import { ProviderRequestError } from "@/server/providers/recargas-america/client";
-import type { ProviderInputField, PurchaseResult } from "@/server/providers/types";
+import type { ProviderInputField, ProviderOrderStatus, PurchaseResult } from "@/server/providers/types";
 import type { SessionUser } from "@/lib/session";
 
 /**
@@ -293,6 +293,42 @@ export async function refundOrder(orderId: string, reason: string): Promise<void
       duplicated: res.duplicated,
     });
   });
+}
+
+/**
+ * Aplica el veredicto que reporta el proveedor a una orden puntual —lo usa el
+ * webhook de EpinBy, y sirve para cualquier otro proveedor que en el futuro
+ * quiera avisar por webhook en vez de esperar a la conciliación por cron.
+ *
+ * Es SEGURO llamarla más de una vez con el mismo resultado (los proveedores
+ * pueden reenviar la misma notificación): si la orden ya no está
+ * PENDING/PROCESSING, no hace nada.
+ */
+export async function applyProviderStatus(
+  orderId: string,
+  status: ProviderOrderStatus,
+  raw: unknown,
+): Promise<void> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) return;
+  if (order.status !== "PENDING" && order.status !== "PROCESSING") return; // ya se cerró, no se toca
+
+  if (status === "COMPLETED") {
+    await updateOrder(order.id, {
+      status: "COMPLETED",
+      resultJson: raw as never,
+      completedAt: new Date(),
+    });
+  } else if (status === "FAILED") {
+    await refundOrder(order.id, "El proveedor reportó la orden como fallida");
+    await updateOrder(order.id, {
+      status: "REFUNDED",
+      resultJson: raw as never,
+      failureCode: "PROVIDER_FAILED",
+      failureMessage: "El proveedor no pudo completar la recarga.",
+    });
+  }
+  // PENDING/PROCESSING/UNKNOWN: sin novedad, la conciliación por cron lo sigue vigilando.
 }
 
 /**

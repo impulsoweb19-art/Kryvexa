@@ -4,51 +4,45 @@ import { db } from "@/db";
 import { providerTransactions } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger, redact } from "@/lib/logger";
-import { ProviderRequestError, type FailureKind } from "../types";
-
-// Re-exportado por compatibilidad: otros módulos ya importan estos dos
-// nombres desde aquí. La definición real vive en `../types` porque la usa
-// cualquier proveedor, no solo este.
-export { ProviderRequestError, type FailureKind };
+import { ProviderRequestError } from "../types";
 
 /**
- * Cliente HTTP de RecargasAmérica.
+ * Cliente HTTP de EpinBy.
  *
- * ── DÓNDE VIVE LA API KEY ───────────────────────────────────────────────────
- * Solo aquí, leída de `RECARGAS_AMERICA_API_KEY`. Este archivo empieza con
- * `import "server-only"`, así que si alguien intentara importarlo desde un
- * componente de cliente el BUILD FALLA. No es una convención: es una barrera
- * del compilador. La key no se registra en logs (el redactor la borra), no se
- * guarda en base de datos y nunca se envía al navegador.
- * ────────────────────────────────────────────────────────────────────────────
+ * Igual que RecargasAmérica: la API key solo se lee aquí, este archivo empieza
+ * con `import "server-only"`, y nada se registra en logs sin pasar por `redact`.
+ *
+ * Autenticación: header `X-API-KEY` (no OAuth, no credenciales de jugador).
+ * Documentación: https://epinby.com/docs
  */
 
-export const PROVIDER_CODE = "recargas_america";
+export const PROVIDER_CODE = "epinby";
 
-/** Envoltorio estándar de la API: { success, data } | { success:false, error, code } */
+/** Envoltorio estándar de la API: { success, data } | { success:false, error: { code, message } } */
 export interface ApiEnvelope<T> {
   success: boolean;
   data?: T;
-  error?: string;
-  code?: string;
+  error?: { code?: string; message?: string };
 }
 
 interface RequestOptions {
-  operation: string; // etiqueta para la bitácora: "buy.games"
+  operation: string; // etiqueta para la bitácora: "order.create"
   method: "GET" | "POST";
-  path: string; // "/buy/games"
+  path: string; // "/order"
   body?: Record<string, unknown>;
   orderId?: string;
-  /** Timeout específico; por defecto el de la variable de entorno. */
+  /** Solo POST /order lo requiere (ver docs de idempotencia). */
+  idempotencyKey?: string;
   timeoutMs?: number;
 }
 
 function config() {
   const e = env();
   return {
-    baseUrl: e.RECARGAS_AMERICA_BASE_URL.replace(/\/+$/, ""),
-    apiKey: e.RECARGAS_AMERICA_API_KEY.trim(),
-    timeoutMs: e.RECARGAS_AMERICA_TIMEOUT_MS,
+    baseUrl: e.EPINBY_BASE_URL.replace(/\/+$/, ""),
+    apiKey: e.EPINBY_API_KEY.trim(),
+    webhookSecret: e.EPINBY_WEBHOOK_SECRET.trim(),
+    timeoutMs: e.EPINBY_TIMEOUT_MS,
     mock: e.PROVIDER_MOCK,
   };
 }
@@ -64,6 +58,10 @@ export function isMock(): boolean {
 
 export function baseUrl(): string {
   return config().baseUrl;
+}
+
+export function webhookSecret(): string {
+  return config().webhookSecret;
 }
 
 /** Persiste la llamada para auditoría. Nunca hace fallar la operación. */
@@ -94,7 +92,7 @@ async function log(entry: {
       durationMs: entry.durationMs,
     });
   } catch (e) {
-    logger.error("No se pudo registrar la llamada al proveedor", {
+    logger.error("No se pudo registrar la llamada a EpinBy", {
       operation: entry.operation,
       error: (e as Error).message,
     });
@@ -108,12 +106,7 @@ async function log(entry: {
 export async function request<T>(opts: RequestOptions): Promise<T> {
   const c = config();
   if (!c.apiKey && !c.mock) {
-    throw new ProviderRequestError(
-      "BUSINESS",
-      "RECARGAS_AMERICA_API_KEY no está configurada",
-      null,
-      "NOT_CONFIGURED",
-    );
+    throw new ProviderRequestError("BUSINESS", "EPINBY_API_KEY no está configurada", null, "NOT_CONFIGURED");
   }
 
   const url = `${c.baseUrl}${opts.path}`;
@@ -122,6 +115,13 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();
 
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "X-API-KEY": c.apiKey,
+  };
+  if (opts.idempotencyKey) headers["X-Idempotency-Key"] = opts.idempotencyKey;
+
   let httpStatus: number | null = null;
   let parsed: ApiEnvelope<T> | null = null;
   let rawText = "";
@@ -129,11 +129,7 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
   try {
     const res = await fetch(url, {
       method: opts.method,
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${c.apiKey}`,
-      },
+      headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
       cache: "no-store",
@@ -160,10 +156,10 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
         errorMessage: "Respuesta no interpretable",
         durationMs,
       });
-      throw new ProviderRequestError("MALFORMED", "Respuesta del proveedor no interpretable", httpStatus);
+      throw new ProviderRequestError("MALFORMED", "Respuesta de EpinBy no interpretable", httpStatus);
     }
 
-    // NUNCA se asume éxito por un HTTP 200: se exige success === true.
+    // NUNCA se asume éxito por un HTTP 200: se exige success === true, igual que RecargasAmérica.
     if (!res.ok || parsed.success !== true) {
       await log({
         ...opts,
@@ -171,14 +167,14 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
         responseBody: parsed,
         httpStatus,
         ok: false,
-        errorMessage: parsed.error ?? `HTTP ${res.status}`,
+        errorMessage: parsed.error?.message ?? `HTTP ${res.status}`,
         durationMs,
       });
       throw new ProviderRequestError(
         res.ok ? "BUSINESS" : "HTTP",
-        parsed.error ?? `El proveedor respondió HTTP ${res.status}`,
+        parsed.error?.message ?? `EpinBy respondió HTTP ${res.status}`,
         httpStatus,
-        parsed.code ?? null,
+        parsed.error?.code ?? null,
         parsed,
       );
     }
@@ -186,7 +182,7 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
     await log({ ...opts, endpoint: url, responseBody: parsed, httpStatus, ok: true, durationMs });
 
     if (parsed.data === undefined) {
-      throw new ProviderRequestError("MALFORMED", "El proveedor devolvió success sin data", httpStatus);
+      throw new ProviderRequestError("MALFORMED", "EpinBy devolvió success sin data", httpStatus);
     }
     return parsed.data;
   } catch (e) {
@@ -194,20 +190,13 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
 
     const durationMs = Date.now() - startedAt;
     const aborted = (e as Error).name === "AbortError";
-    const kind: FailureKind = aborted ? "TIMEOUT" : "NETWORK";
+    const kind = aborted ? "TIMEOUT" : "NETWORK";
     const message = aborted
       ? `Tiempo de espera agotado (${timeoutMs} ms)`
       : `Error de red: ${(e as Error).message}`;
 
-    await log({
-      ...opts,
-      endpoint: url,
-      httpStatus,
-      ok: false,
-      errorMessage: message,
-      durationMs,
-    });
-    logger.warn("Fallo de comunicación con el proveedor", { operation: opts.operation, kind, message });
+    await log({ ...opts, endpoint: url, httpStatus, ok: false, errorMessage: message, durationMs });
+    logger.warn("Fallo de comunicación con EpinBy", { operation: opts.operation, kind, message });
 
     throw new ProviderRequestError(kind, message, httpStatus);
   } finally {

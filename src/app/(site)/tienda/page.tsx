@@ -9,10 +9,15 @@ import { getBalance } from "@/server/services/wallet";
 export const metadata: Metadata = { title: "Tienda" };
 export const dynamic = "force-dynamic";
 
+// Ahora que hay más de un juego en el catálogo, esta página se queda
+// explícitamente con Free Fire (antes no hacía falta filtrar porque era lo
+// único que existía). Mobile Legends vive en /tienda/mobile-legends.
+const FREE_FIRE_FILTER = /free\s*fire/i;
+
 export default async function StorePage() {
   const user = await requireUserPage("/tienda");
   const [products, balance] = await Promise.all([
-    listStoreProducts().catch(() => []),
+    listStoreProducts(FREE_FIRE_FILTER).catch(() => []),
     getBalance(user.id),
   ]);
 

@@ -11,11 +11,14 @@ import { getBalance } from "@/server/services/wallet";
 export const dynamic = "force-dynamic";
 
 /**
- * Juegos que se ofrecen. Hoy solo Free Fire; añadir otro es agregar un objeto
- * aquí y su imagen en `public/juegos/`. La rejilla se adapta sola.
+ * Juegos que se ofrecen. Añadir otro es agregar un objeto aquí, su imagen en
+ * `public/juegos/`, y la página de tienda propia de ese juego (ver
+ * `/tienda/mobile-legends` como ejemplo). La rejilla se adapta sola y las
+ * tarjetas quedan centradas automáticamente (`justify-center` más abajo).
  *
- * Para cambiar la imagen de Free Fire basta reemplazar el archivo
- * `public/juegos/free-fire.jpg` por otro con el mismo nombre.
+ * Cada juego tiene su PROPIA página de tienda (`href`): así, si el catálogo
+ * de un juego nuevo se sincroniza mal o el proveedor falla, no afecta en nada
+ * lo que ve quien entra a otro juego.
  */
 const GAMES = [
   {
@@ -23,6 +26,14 @@ const GAMES = [
     tagline: "Diamantes, pases y membresías",
     image: "/juegos/free-fire.jpg",
     badge: "Disponible",
+    href: "/tienda",
+  },
+  {
+    name: "Mobile Legends",
+    tagline: "Diamantes",
+    image: "/juegos/mobile-legends.jpg",
+    badge: "Disponible",
+    href: "/tienda/mobile-legends",
   },
 ];
 
@@ -41,7 +52,7 @@ export default async function HomePage() {
 
   // Sin sesión no se puede entrar a la tienda: se manda a crear cuenta y, al
   // terminar, el propio flujo de registro deja al usuario dentro.
-  const storeHref = user ? "/tienda" : "/registro";
+  const gameHref = (game: (typeof GAMES)[number]) => (user ? game.href : "/registro");
 
   return (
     <>
@@ -200,7 +211,7 @@ export default async function HomePage() {
           {GAMES.map((game) => (
             <GameCard
               key={game.name}
-              href={storeHref}
+              href={gameHref(game)}
               name={game.name}
               tagline={game.tagline}
               image={game.image}

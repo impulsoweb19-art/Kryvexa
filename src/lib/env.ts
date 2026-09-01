@@ -24,6 +24,13 @@ const schema = z.object({
   RECARGAS_AMERICA_BASE_URL: z.string().url().default("https://panel.recargasamerica.com/api/v1"),
   RECARGAS_AMERICA_API_KEY: z.string().default(""),
   RECARGAS_AMERICA_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+
+  EPINBY_BASE_URL: z.string().url().default("https://epinby.com/api/v1"),
+  EPINBY_API_KEY: z.string().default(""),
+  EPINBY_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  /** Obtenido una vez desde GET /getMe. Firma los webhooks entrantes (HMAC-SHA256). */
+  EPINBY_WEBHOOK_SECRET: z.string().default(""),
+
   PROVIDER_MOCK: bool,
 
   /**
