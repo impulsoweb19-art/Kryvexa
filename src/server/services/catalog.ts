@@ -28,7 +28,9 @@ import { getConfig, type StoreConfig } from "./settings";
  */
 const GAME_FILTERS: Record<string, RegExp> = {
   recargas_america: /free\s*fire/i,
-  epinby: /mobile\s*legends/i,
+  // El catálogo real de EpinBy nombra el juego "Mobil Legends" (sin la
+  // segunda "e"), así que esa "e" es opcional — igual que en epinby/index.ts.
+  epinby: /mobile?\s*legends/i,
 };
 
 export interface StoreProduct {
@@ -129,7 +131,7 @@ export const isFreeFireProduct = (p: Product) =>
   p.providerCode === "recargas_america" || (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName));
 
 export const isMobileLegendsProduct = (p: Product) =>
-  p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile\s*legends/i.test(p.gameName));
+  p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile?\s*legends/i.test(p.gameName));
 
 export async function listAllProducts(): Promise<Product[]> {
   return db.select().from(products).orderBy(asc(products.sortOrder), asc(products.costUsdCents));

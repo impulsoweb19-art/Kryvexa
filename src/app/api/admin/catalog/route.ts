@@ -6,6 +6,10 @@ import { recordAudit } from "@/server/services/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// El catálogo de EpinBy trae ~2500 productos en ~25 páginas; aunque se piden
+// en paralelo, sigue siendo más lento que una petición normal. Margen extra
+// para que no se corte a medio sincronizar.
+export const maxDuration = 60;
 
 /** Fuerza una sincronización del catálogo contra el proveedor. */
 export const POST = route("admin.catalog.sync", async (req) => {

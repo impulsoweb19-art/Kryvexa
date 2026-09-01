@@ -89,6 +89,15 @@ export function productKind(raw: RawProduct): ProductKind {
   return raw.type === "TOPUP" ? "RECHARGE" : "PIN";
 }
 
+/**
+ * El catálogo real de EpinBy nombra el juego "Mobil Legends" (sin la segunda
+ * "e" de "Mobile"). Se normaliza al nombre correcto para no mostrarlo mal
+ * escrito en la tienda ni en el panel admin.
+ */
+function normalizeGameName(game: string): string {
+  return /^mobile?\s*legends$/i.test(game.trim()) ? "Mobile Legends" : game;
+}
+
 export function mapProduct(raw: RawProduct): ProviderProduct {
   const kind = productKind(raw);
 
@@ -96,7 +105,7 @@ export function mapProduct(raw: RawProduct): ProviderProduct {
     externalId: String(raw.id),
     kind,
     sku: null,
-    gameName: raw.game || "Desconocido",
+    gameName: normalizeGameName(raw.game || "Desconocido"),
     packageName: raw.name,
     costUsdCents: priceToUsdCents(raw.price),
     // Se usan los mismos nombres de campo que RecargasAmérica (input1/input2,

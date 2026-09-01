@@ -6,6 +6,10 @@ import { syncCatalog } from "@/server/services/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// El catálogo de EpinBy trae ~2500 productos en ~25 páginas; aunque se piden
+// en paralelo, sigue siendo más lento que una petición normal. Margen extra
+// para que no se corte a medio sincronizar.
+export const maxDuration = 60;
 
 /**
  * Refresco del catálogo. Llamar cada 30-60 minutos:

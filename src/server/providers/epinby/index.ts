@@ -26,8 +26,12 @@ import {
 import * as mock from "./mock";
 import { logger } from "@/lib/logger";
 
-/** Solo Mobile Legends en esta versión — mismo criterio que Free Fire en RecargasAmérica. */
-const GAME_FILTER = /mobile\s*legends/i;
+/**
+ * Solo Mobile Legends en esta versión — mismo criterio que Free Fire en
+ * RecargasAmérica. El catálogo real de EpinBy nombra el juego "Mobil
+ * Legends" (sin la segunda "e" de "Mobile"), así que esa "e" es opcional.
+ */
+const GAME_FILTER = /mobile?\s*legends/i;
 
 interface RawGetMe {
   user_id: number;
@@ -81,18 +85,28 @@ class EpinbyService implements ProviderAdapter {
   async listProducts(): Promise<ProviderProduct[]> {
     if (isMock()) return mock.mockProducts.filter(matchesGame).map(mapProduct);
 
-    const all: RawProduct[] = [];
-    let page = 1;
-    // per_page máximo documentado es 100; se recorren las páginas hasta agotarlas.
-    for (;;) {
-      const raw = await request<RawProductsPage>({
+    // El catálogo completo de EpinBy tiene ~2500 productos en ~25 páginas de
+    // 100 (todos los juegos que vende, no solo Mobile Legends). Pedirlas una
+    // por una agotaba el tiempo máximo de la función antes de terminar — se
+    // piden en paralelo, por tandas, para que la sincronización termine a
+    // tiempo sin lanzar 25 peticiones simultáneas de golpe.
+    const fetchPage = (page: number) =>
+      request<RawProductsPage>({
         operation: "products.list",
         method: "GET",
         path: `/products?per_page=100&page=${page}`,
       });
-      all.push(...(raw.data ?? []));
-      if (!raw.meta || raw.meta.current_page >= raw.meta.last_page) break;
-      page += 1;
+
+    const first = await fetchPage(1);
+    const all: RawProduct[] = [...(first.data ?? [])];
+    const lastPage = first.meta?.last_page ?? 1;
+
+    const CONCURRENCY = 8;
+    for (let start = 2; start <= lastPage; start += CONCURRENCY) {
+      const batch = await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, lastPage - start + 1) }, (_, i) => fetchPage(start + i)),
+      );
+      for (const page of batch) all.push(...(page.data ?? []));
     }
 
     return all.filter(matchesGame).map(mapProduct);
