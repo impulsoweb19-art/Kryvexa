@@ -12,7 +12,7 @@ import type {
   ValidateAccountInput,
   ValidateAccountResult,
 } from "../types";
-import { PROVIDER_CODE, baseUrl, isConfigured, isMock, request } from "./client";
+import { PROVIDER_CODE, baseUrl, isConfigured, isMock, request, requestEnvelope } from "./client";
 import {
   type RawGame,
   type RawOrder,
@@ -39,11 +39,6 @@ interface RawGetMe {
   balance: string;
   webhook_secret: string;
   currency: string;
-}
-
-interface RawProductsPage {
-  data: RawProduct[];
-  meta: { total: number; per_page: number; current_page: number; last_page: number };
 }
 
 /**
@@ -90,8 +85,12 @@ class EpinbyService implements ProviderAdapter {
     // por una agotaba el tiempo máximo de la función antes de terminar — se
     // piden en paralelo, por tandas, para que la sincronización termine a
     // tiempo sin lanzar 25 peticiones simultáneas de golpe.
+    //
+    // Usa `requestEnvelope` (no `request`) porque `last_page` viaja en
+    // `meta`, junto a `data` — no adentro de `data` — y `request` normal
+    // desenvuelve y descarta todo lo que no sea `data`.
     const fetchPage = (page: number) =>
-      request<RawProductsPage>({
+      requestEnvelope<RawProduct[]>({
         operation: "products.list",
         method: "GET",
         path: `/products?per_page=100&page=${page}`,

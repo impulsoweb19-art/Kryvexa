@@ -18,11 +18,16 @@ import { ProviderRequestError } from "../types";
 
 export const PROVIDER_CODE = "epinby";
 
-/** Envoltorio estándar de la API: { success, data } | { success:false, error: { code, message } } */
+/**
+ * Envoltorio estándar de la API: { success, data } | { success:false, error }.
+ * Los endpoints paginados (como /products) agregan `meta` junto a `data`,
+ * no adentro — por eso viaja como campo del sobre, no de `T`.
+ */
 export interface ApiEnvelope<T> {
   success: boolean;
   data?: T;
   error?: { code?: string; message?: string };
+  meta?: { total: number; per_page: number; current_page: number; last_page: number };
 }
 
 interface RequestOptions {
@@ -100,10 +105,12 @@ async function log(entry: {
 }
 
 /**
- * Ejecuta una petición y devuelve `data` ya desenvuelto.
+ * Ejecuta una petición y devuelve el SOBRE completo ({ success, data, meta,
+ * ... }), sin desenvolver. Lo necesitan los endpoints paginados como
+ * /products, donde `meta` (con `last_page`) viaja junto a `data`, no dentro.
  * Lanza `ProviderRequestError` en cualquier fallo, clasificado por `kind`.
  */
-export async function request<T>(opts: RequestOptions): Promise<T> {
+export async function requestEnvelope<T>(opts: RequestOptions): Promise<ApiEnvelope<T>> {
   const c = config();
   if (!c.apiKey && !c.mock) {
     throw new ProviderRequestError("BUSINESS", "EPINBY_API_KEY no está configurada", null, "NOT_CONFIGURED");
@@ -184,7 +191,7 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
     if (parsed.data === undefined) {
       throw new ProviderRequestError("MALFORMED", "EpinBy devolvió success sin data", httpStatus);
     }
-    return parsed.data;
+    return parsed;
   } catch (e) {
     if (e instanceof ProviderRequestError) throw e;
 
@@ -202,4 +209,10 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Ejecuta una petición y devuelve solo `data`, ya desenvuelto. */
+export async function request<T>(opts: RequestOptions): Promise<T> {
+  const envelope = await requestEnvelope<T>(opts);
+  return envelope.data as T;
 }
