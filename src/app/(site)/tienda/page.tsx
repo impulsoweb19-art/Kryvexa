@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Badge, Button, EmptyState } from "@/components/ui";
 import { formatPEN } from "@/lib/money";
 import { requireUserPage } from "@/lib/guards";
-import { listStoreProducts } from "@/server/services/catalog";
+import { isFreeFireProduct, listStoreProducts } from "@/server/services/catalog";
 import { getBalance } from "@/server/services/wallet";
 
 export const metadata: Metadata = { title: "Tienda" };
@@ -13,11 +13,9 @@ export default async function StorePage() {
   const user = await requireUserPage("/tienda");
   const [products, balance] = await Promise.all([
     // Ahora que hay más de un juego en el catálogo, esta página se queda
-    // explícitamente con lo de RecargasAmérica (antes no hacía falta filtrar
-    // porque era el único proveedor). Mobile Legends vive en
-    // /tienda/mobile-legends. Se filtra por proveedor, no por el nombre del
-    // juego (ver el comentario en `listStoreProducts`).
-    listStoreProducts("recargas_america").catch(() => []),
+    // explícitamente con Free Fire (RecargasAmérica + lo de entrega manual
+    // que sea de este juego). Mobile Legends vive en /tienda/mobile-legends.
+    listStoreProducts(isFreeFireProduct).catch(() => []),
     getBalance(user.id),
   ]);
 

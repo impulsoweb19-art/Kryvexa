@@ -97,31 +97,39 @@ export function toStoreProduct(product: Product, config: StoreConfig): StoreProd
 }
 
 /**
- * @param providerCode Si se pasa, solo devuelve productos de ESE proveedor
+ * @param filter Si se pasa, solo devuelve productos que cumplan la condición
  * (p. ej. la página de un juego concreto). Sin filtro, devuelve todo lo
  * visible — lo usa la portada para el contador general de paquetes.
  *
- * Se filtra por `providerCode`, NO por `gameName`: el nombre del juego es
- * texto libre que a veces sale mal armado (ver `guessGameName` en el mapper
- * de RecargasAmérica, que puede producir cosas como "Recarga Free" en vez de
+ * Por qué una función y no un simple `providerCode`: el proveedor "manual"
+ * (Pase Booyah, membresías, Cajas/Fragmentos Evo) no es exclusivo de un
+ * juego — el mismo proveedor puede tener productos de Free Fire, y en el
+ * futuro de cualquier otro. Para esos SÍ hace falta mirar `gameName` (que
+ * nosotros mismos escribimos en `seed.ts`, así que es confiable). Para los
+ * proveedores con API propia (RecargasAmérica, EpinBy) basta con el
+ * `providerCode`: cada uno sirve un solo juego, y su `gameName` es texto
+ * libre que a veces sale mal armado (ver `guessGameName` en el mapper de
+ * RecargasAmérica, que puede producir cosas como "Recarga Free" en vez de
  * "Free Fire" si el nombre del producto no calza con el patrón esperado).
- * Cada proveedor de la v1 sirve un solo juego, así que providerCode identifica
- * el juego de forma confiable aunque el texto de gameName no sea prolijo.
  */
-export async function listStoreProducts(providerCode?: string): Promise<StoreProduct[]> {
+export async function listStoreProducts(filter?: (p: Product) => boolean): Promise<StoreProduct[]> {
   const config = await getConfig();
   const rows = await db
     .select()
     .from(products)
-    .where(
-      providerCode
-        ? and(eq(products.visible, true), eq(products.active, true), eq(products.providerCode, providerCode))
-        : and(eq(products.visible, true), eq(products.active, true)),
-    )
+    .where(and(eq(products.visible, true), eq(products.active, true)))
     .orderBy(asc(products.sortOrder), asc(products.costUsdCents));
 
-  return rows.map((p) => toStoreProduct(p, config));
+  const filtered = filter ? rows.filter(filter) : rows;
+  return filtered.map((p) => toStoreProduct(p, config));
 }
+
+/** Filtros listos para usar en las páginas de tienda de cada juego. */
+export const isFreeFireProduct = (p: Product) =>
+  p.providerCode === "recargas_america" || (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName));
+
+export const isMobileLegendsProduct = (p: Product) =>
+  p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile\s*legends/i.test(p.gameName));
 
 export async function listAllProducts(): Promise<Product[]> {
   return db.select().from(products).orderBy(asc(products.sortOrder), asc(products.costUsdCents));
