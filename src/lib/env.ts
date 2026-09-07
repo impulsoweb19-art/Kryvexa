@@ -67,6 +67,19 @@ const schema = z.object({
    */
   RESEND_API_KEY: z.string().default(""),
   EMAIL_FROM: z.string().default("Kryvexa <no-reply@kryvexa.com>"),
+
+  /**
+   * Notificación por WhatsApp al dueño del negocio cuando entra un pedido de
+   * entrega manual (ver `server/services/orders.ts`). Igual que RESEND_API_KEY:
+   * opcional a propósito, para que su ausencia solo apague la notificación,
+   * no la creación del pedido.
+   */
+  TWILIO_ACCOUNT_SID: z.string().default(""),
+  TWILIO_AUTH_TOKEN: z.string().default(""),
+  /** Remitente de WhatsApp aprobado por Meta, formato "whatsapp:+1XXXXXXXXXX". */
+  TWILIO_WHATSAPP_FROM: z.string().default(""),
+  /** A dónde llega la notificación, formato "whatsapp:+51XXXXXXXXX". */
+  TWILIO_NOTIFY_WHATSAPP_TO: z.string().default(""),
 });
 
 /**

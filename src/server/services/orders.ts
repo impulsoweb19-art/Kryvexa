@@ -7,6 +7,7 @@ import { AppError } from "@/lib/errors";
 import { humanCode } from "@/lib/ids";
 import { logger } from "@/lib/logger";
 import { applyTransaction, ensureWallet } from "./wallet";
+import { sendManualOrderNotification } from "@/lib/whatsapp";
 import { getPurchasableProduct, sellPriceCents } from "./catalog";
 import { recordAudit } from "./audit";
 import { getProvider } from "@/server/providers/registry";
@@ -157,6 +158,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     entityId: finalOrder.id,
     meta: { status: finalOrder.status, priceCents, productId: product.id },
   });
+
+  // El proveedor "manual" siempre deja la orden en PENDING a la espera de
+  // que el dueño la entregue a mano: es el único caso donde tiene sentido
+  // avisarle por WhatsApp (los demás proveedores se resuelven solos).
+  if (finalOrder.providerCode === "manual" && finalOrder.status === "PENDING") {
+    void sendManualOrderNotification({
+      code: finalOrder.code,
+      productLabel: `${finalOrder.gameName} — ${finalOrder.productName}`,
+      priceCents: finalOrder.priceCents,
+      customerLabel: input.user.name || input.user.email,
+    });
+  }
 
   return { order: finalOrder, duplicated: false };
 }
