@@ -16,13 +16,15 @@ import { logger } from "./logger";
  * un mensaje pre-aprobado por Meta para iniciar la conversación — el dueño
  * nunca le escribe primero al número de Kryvexa.
  */
-const CONTENT_SID = "HX54de009fba380ca0eb8c024d48b437ec";
+const CONTENT_SID = "HXcfc0f2f642d193bf1e4facbd90c8ac6e";
 
 export async function sendManualOrderNotification(input: {
   code: string;
   productLabel: string;
   priceCents: number;
   customerLabel: string;
+  /** Lo que escribió el comprador (ID de jugador, servidor…), ya formateado. */
+  detailsLabel: string;
 }): Promise<void> {
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_NOTIFY_WHATSAPP_TO } = env();
 
@@ -42,6 +44,7 @@ export async function sendManualOrderNotification(input: {
       "2": input.productLabel,
       "3": priceLabel,
       "4": input.customerLabel,
+      "5": input.detailsLabel,
     }),
   });
 

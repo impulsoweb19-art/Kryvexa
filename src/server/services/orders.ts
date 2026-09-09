@@ -85,6 +85,19 @@ export function assertInputsMatch(product: Product, inputs: Record<string, strin
   }
 }
 
+/**
+ * Convierte los inputs de la orden en una línea legible para la notificación
+ * de WhatsApp ("ID de jugador: 123456, Servidor: 3001"), usando las etiquetas
+ * que ya declara el producto en vez de los nombres crudos ("input1").
+ */
+function describeInputs(product: Product, inputs: Record<string, string>): string {
+  const fields = (product.inputFields as ProviderInputField[]) ?? [];
+  const parts = fields
+    .filter((field) => inputs[field.name])
+    .map((field) => `${field.label}: ${inputs[field.name]}`);
+  return parts.length > 0 ? parts.join(", ") : "—";
+}
+
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const { product, config } = await getPurchasableProduct(input.productId);
   const priceCents = sellPriceCents(product, config);
@@ -168,6 +181,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       productLabel: `${finalOrder.gameName} — ${finalOrder.productName}`,
       priceCents: finalOrder.priceCents,
       customerLabel: input.user.name || input.user.email,
+      detailsLabel: describeInputs(product, input.inputs),
     });
   }
 
