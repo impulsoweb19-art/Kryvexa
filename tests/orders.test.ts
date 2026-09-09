@@ -161,6 +161,24 @@ describe("motor de órdenes", () => {
     assert.equal(await balanceOf(user.id), 5000 - 1780);
   });
 
+  it("retiene el saldo y pide revisión cuando el proveedor reporta un fallo", async () => {
+    const user = await createTestUser(5000);
+    const product = await createTestProduct();
+
+    const { order } = await createOrder({
+      user,
+      productId: product.id,
+      inputs: { input1: "123456781", input2: "3001" }, // termina en 1 → FAILED
+      expectedPriceCents: 1780,
+      idempotencyKey: randomUUID(),
+    });
+
+    // Que el proveedor diga "falló" no prueba que no ejecutara la recarga:
+    // devolver el saldo aquí es lo que hizo pagar dos entregas el 8/9/2026.
+    assert.equal(order.status, "NEEDS_REVIEW");
+    assert.equal(await balanceOf(user.id), 5000 - 1780);
+  });
+
   it("el reembolso es idempotente: nunca devuelve el saldo dos veces", async () => {
     const user = await createTestUser(5000);
     const product = await createTestProduct();

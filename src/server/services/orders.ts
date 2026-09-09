@@ -32,10 +32,17 @@ import type { SessionUser } from "@/lib/session";
  *      Nunca se mantiene abierta una transacción de base de datos mientras se
  *      espera una respuesta HTTP: bloquearía la fila hasta 30 segundos.
  *   4. Mapear la respuesta a NUESTROS estados y cerrar la orden.
- *   5. Si falló de forma CONOCIDA → reembolso idempotente.
- *      Si el resultado es DESCONOCIDO (timeout, red caída) → NO se reembolsa:
- *      la orden queda PENDING y la resuelve la conciliación. Reembolsar a
- *      ciegas una recarga que sí se entregó sería regalar dinero.
+ *   5. NINGÚN fallo devuelve saldo solo. Si el resultado es DESCONOCIDO
+ *      (timeout, red caída) la orden queda PENDING y la sigue la conciliación;
+ *      si el proveedor dice que falló, pasa a NEEDS_REVIEW con el dinero
+ *      retenido y lo decide una persona desde /admin/pedidos.
+ *
+ *      Antes se reembolsaba al instante cuando el proveedor reportaba fallo,
+ *      dando por hecho que no había ejecutado nada. El 8/9/2026 esa suposición
+ *      costó dinero: RecargasAmérica respondió con error en ORD-8RMSWC44 pero
+ *      SÍ había hecho la recarga y SÍ la cobró ($6.59). Se devolvió el saldo,
+ *      el comprador volvió a comprar, y el negocio pagó dos entregas cobrando
+ *      una. "El proveedor dijo que falló" no prueba que no gastara nada.
  */
 
 const MAX_RECONCILE_ATTEMPTS = 12; // ≈ 24 min con el cron cada 2 minutos
@@ -220,18 +227,19 @@ async function executePurchase(order: Order, product: Product): Promise<Order> {
       });
     }
 
-    // Error de negocio conocido (saldo del revendedor, producto inválido, 4xx/5xx
-    // con cuerpo interpretable): el proveedor no ejecutó nada. Reembolso inmediato.
+    // El proveedor respondió con error (saldo del revendedor, producto
+    // inválido, 4xx/5xx con cuerpo interpretable). Eso NO garantiza que no
+    // ejecutara la recarga, así que el saldo se retiene y lo decide una
+    // persona en el panel.
     logger.error("El proveedor rechazó la orden", {
       orderId: order.id,
       code: err instanceof ProviderRequestError ? err.providerCode : null,
       message: (e as Error).message,
     });
-    await refundOrder(order.id, "Rechazada por el proveedor");
     return updateOrder(order.id, {
-      status: "REFUNDED",
+      status: "NEEDS_REVIEW",
       failureCode: (err instanceof ProviderRequestError ? err.providerCode : null) ?? "PROVIDER_ERROR",
-      failureMessage: "El proveedor no pudo completar la recarga.",
+      failureMessage: "El proveedor reportó un error. Verifica en su panel antes de devolver el saldo.",
     });
   }
 
@@ -255,14 +263,15 @@ async function executePurchase(order: Order, product: Product): Promise<Order> {
       });
 
     case "FAILED":
-      await refundOrder(order.id, "El proveedor reportó la orden como fallida");
+      // Sin reembolso automático: el proveedor puede haber ejecutado la
+      // recarga igual (ver la nota del 8/9/2026 arriba).
       return updateOrder(order.id, {
-        status: "REFUNDED",
+        status: "NEEDS_REVIEW",
         providerReference: result.reference,
         providerTxId: result.transactionId,
         resultJson: result.raw as never,
         failureCode: result.errorCode ?? "PROVIDER_FAILED",
-        failureMessage: "El proveedor no pudo completar la recarga.",
+        failureMessage: "El proveedor reportó un error. Verifica en su panel antes de devolver el saldo.",
       });
 
     default:
@@ -347,12 +356,11 @@ export async function applyProviderStatus(
       completedAt: new Date(),
     });
   } else if (status === "FAILED") {
-    await refundOrder(order.id, "El proveedor reportó la orden como fallida");
     await updateOrder(order.id, {
-      status: "REFUNDED",
+      status: "NEEDS_REVIEW",
       resultJson: raw as never,
       failureCode: "PROVIDER_FAILED",
-      failureMessage: "El proveedor no pudo completar la recarga.",
+      failureMessage: "El proveedor reportó un error. Verifica en su panel antes de devolver el saldo.",
     });
   }
   // PENDING/PROCESSING/UNKNOWN: sin novedad, la conciliación por cron lo sigue vigilando.
@@ -378,7 +386,8 @@ export async function reconcilePendingOrders(limit = 25) {
     .orderBy(desc(orders.createdAt))
     .limit(limit);
 
-  const summary = { checked: 0, completed: 0, refunded: 0, stillPending: 0, needsReview: 0 };
+  // Sin contador de reembolsos: la conciliación ya no devuelve saldo sola.
+  const summary = { checked: 0, completed: 0, stillPending: 0, needsReview: 0 };
 
   for (const order of pending) {
     summary.checked += 1;
@@ -410,16 +419,15 @@ export async function reconcilePendingOrders(limit = 25) {
         });
         summary.completed += 1;
       } else if (status.status === "FAILED") {
-        await refundOrder(order.id, "El proveedor cerró la orden como fallida");
         await updateOrder(order.id, {
-          status: "REFUNDED",
+          status: "NEEDS_REVIEW",
           resultJson: status.raw as never,
           failureCode: "PROVIDER_FAILED",
-          failureMessage: "El proveedor no pudo completar la recarga.",
+          failureMessage: "El proveedor reportó un error. Verifica en su panel antes de devolver el saldo.",
           attempts,
           lastCheckedAt: new Date(),
         });
-        summary.refunded += 1;
+        summary.needsReview += 1;
       } else if (attempts >= MAX_RECONCILE_ATTEMPTS) {
         await updateOrder(order.id, { status: "NEEDS_REVIEW", attempts, lastCheckedAt: new Date() });
         summary.needsReview += 1;

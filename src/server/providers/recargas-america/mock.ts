@@ -80,13 +80,17 @@ function decodeReferenceCreatedAt(reference: string): number | null {
 
 /**
  * Un ID terminado en "0" produce una orden PENDING (para probar la
- * conciliación); el resto se completan al instante.
+ * conciliación) y uno terminado en "1", una FAILED (para probar que un fallo
+ * del proveedor NO devuelve saldo solo); el resto se completan al instante.
+ *
+ * El "1" no es casual: el ID de ejemplo de casi todas las pruebas termina en
+ * 9, así que ese dígito no sirve como disparador.
  */
 export function mockBuyGames(packageId: string, inputs: Record<string, string>) {
   const playerId = inputs.input1 ?? "";
   const reference = encodeReference(Date.now());
   const product = mockGameProducts.find((p) => String(p.id) === packageId);
-  const status = playerId.endsWith("0") ? "PENDING" : "COMPLETED";
+  const status = playerId.endsWith("0") ? "PENDING" : playerId.endsWith("1") ? "FAILED" : "COMPLETED";
 
   return {
     transaction_id: Date.now(),
