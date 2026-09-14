@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { Alert, Button, Field, Input, cx } from "@/components/ui";
 import { formatPEN } from "@/lib/money";
+import { compressImage } from "@/lib/image";
 
 /**
  * Solicitud de depósito por Yape.
@@ -15,7 +16,18 @@ import { formatPEN } from "@/lib/money";
 
 const QUICK_AMOUNTS = [1000, 2000, 3000, 5000, 10000, 20000];
 const ACCEPTED = "image/jpeg,image/png,image/webp,application/pdf";
-const MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * 4 MB, por debajo del tope REAL de la plataforma (Vercel corta cualquier
+ * petición de más de 4.5 MB antes de que llegue a nuestro código, así que
+ * pasado ese punto es imposible responder un error con sentido). Las fotos
+ * se comprimen antes de medirlas, así que este límite solo lo alcanzan los
+ * PDF grandes.
+ */
+const MAX_BYTES = 4 * 1024 * 1024;
+
+/** Ni se intenta comprimir algo así de grande: primero se avisa. */
+const ABSURDLY_LARGE_BYTES = 25 * 1024 * 1024;
 
 export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
   const router = useRouter();
@@ -45,22 +57,42 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
     e.preventDefault();
     setError(null);
 
-    const file = fileInput.current?.files?.[0];
-    if (!file) return setError("Adjunta la captura de tu pago.");
-    if (file.size > MAX_BYTES) return setError("El archivo supera los 5 MB.");
+    const original = fileInput.current?.files?.[0];
+    if (!original) return setError("Adjunta la captura de tu pago.");
+    if (original.size > ABSURDLY_LARGE_BYTES) {
+      return setError("El archivo es demasiado pesado. Sube una captura de pantalla del pago.");
+    }
     if (amountCents < minDepositCents) {
       return setError(`El monto mínimo es ${formatPEN(minDepositCents)}.`);
     }
 
     const body = new FormData(e.currentTarget);
     body.set("amountCents", String(amountCents));
-    body.set("receipt", file);
 
     setLoading(true);
     try {
-      const res = await fetch("/api/deposits", { method: "POST", body });
-      const json = await res.json();
+      // Una foto de cámara pesa varios MB y la plataforma corta la subida a
+      // medias; comprimida entra sin problema. Por eso el tamaño se mide
+      // DESPUÉS de comprimir, no antes.
+      const file = await compressImage(original);
+      if (file.size > MAX_BYTES) {
+        throw new Error("El archivo supera los 4 MB. Sube una captura de pantalla o una imagen más liviana.");
+      }
+      body.set("receipt", file);
+
+      let res: Response;
+      try {
+        res = await fetch("/api/deposits", { method: "POST", body });
+      } catch {
+        // Falla de red: el navegador dice "Failed to fetch", que no le sirve
+        // de nada a quien está intentando recargar.
+        throw new Error("No pudimos enviar el comprobante. Revisa tu conexión e inténtalo de nuevo.");
+      }
+
+      const json = await res.json().catch(() => null);
+      if (!json) throw new Error("No pudimos enviar el comprobante. Inténtalo de nuevo en un momento.");
       if (!res.ok || !json.success) throw new Error(json.error ?? "No pudimos registrar tu solicitud.");
+
       setDone({ code: json.data.code, amountCents: json.data.amountCents });
       router.refresh();
     } catch (err) {
@@ -123,7 +155,11 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
         <Input id="operationCode" name="operationCode" placeholder="Ej. 01234567" />
       </Field>
 
-      <Field label="Comprobante de pago" htmlFor="receipt" hint="JPG, PNG, WebP o PDF. Máximo 5 MB.">
+      <Field
+        label="Comprobante de pago"
+        htmlFor="receipt"
+        hint="JPG, PNG, WebP o PDF. Las fotos se comprimen solas antes de enviarse."
+      >
         <input
           ref={fileInput}
           id="receipt"

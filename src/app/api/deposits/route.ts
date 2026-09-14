@@ -8,6 +8,11 @@ import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// El comprobante entra por aquí y de aquí sale hacia Vercel Blob: son dos
+// transferencias seguidas, y del otro lado suele haber datos móviles. Con el
+// límite por defecto la conexión se cortaba a medias y el navegador solo
+// mostraba "Failed to fetch".
+export const maxDuration = 30;
 
 /**
  * Solicitud de depósito por Yape. Llega como multipart porque incluye la
