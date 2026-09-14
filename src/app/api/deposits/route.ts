@@ -29,6 +29,7 @@ export const POST = route("deposits.create", async (req) => {
 
   const amountRaw = form.get("amountCents");
   const operationCode = form.get("operationCode");
+  const idempotencyKey = form.get("idempotencyKey");
   const file = form.get("receipt");
 
   if (!(file instanceof File)) {
@@ -38,6 +39,8 @@ export const POST = route("deposits.create", async (req) => {
   const input = createDepositSchema.parse({
     amountCents: Number(amountRaw),
     operationCode: typeof operationCode === "string" && operationCode ? operationCode : undefined,
+    idempotencyKey:
+      typeof idempotencyKey === "string" && idempotencyKey ? idempotencyKey : undefined,
   });
 
   const config = await getConfig();
@@ -51,6 +54,7 @@ export const POST = route("deposits.create", async (req) => {
     userId: user.id,
     amountCents: input.amountCents,
     operationCode: input.operationCode,
+    idempotencyKey: input.idempotencyKey,
     file,
   });
 

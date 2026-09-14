@@ -1,7 +1,13 @@
 import { before, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { balanceOf, createTestAdmin, createTestUser, ledgerOf } from "./helpers";
-import { approveDeposit, createDeposit, rejectDeposit } from "@/server/services/deposits";
+import {
+  approveDeposit,
+  createDeposit,
+  listDepositsForAdmin,
+  rejectDeposit,
+} from "@/server/services/deposits";
 import { isAppError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/session";
 
@@ -35,6 +41,46 @@ describe("depósitos por Yape", () => {
 
     assert.equal(deposit.status, "PENDING");
     assert.equal(await balanceOf(user.id), 0); // aún no se acredita nada
+  });
+
+  it("no crea dos solicitudes cuando se reintenta el mismo envío", async () => {
+    const user = await createTestUser(0);
+    const key = randomUUID();
+
+    // El navegador puede no llegar a ver la respuesta aunque el servidor sí
+    // haya creado la solicitud, y entonces se reintenta el mismo pago.
+    const first = await createDeposit({
+      userId: user.id,
+      amountCents: 5000,
+      idempotencyKey: key,
+      file: pngFile(),
+    });
+    const retry = await createDeposit({
+      userId: user.id,
+      amountCents: 5000,
+      idempotencyKey: key,
+      file: pngFile(),
+    });
+
+    assert.equal(retry.id, first.id, "el reintento debe devolver la MISMA solicitud");
+    assert.equal(retry.code, first.code);
+
+    // Y el pendiente se contó una sola vez: aprobar dos veces el mismo pago de
+    // Yape acreditaría el doble.
+    const { rows } = await listDepositsForAdmin({ search: user.email });
+    assert.equal(rows.length, 1, "no debe haber una segunda solicitud");
+  });
+
+  it("sin clave de idempotencia sigue registrando cada solicitud", async () => {
+    const user = await createTestUser(0);
+
+    // Un navegador con la página abierta desde antes del despliegue no manda
+    // la clave; eso no puede dejarlo sin poder recargar.
+    await createDeposit({ userId: user.id, amountCents: 5000, file: pngFile() });
+    await createDeposit({ userId: user.id, amountCents: 5000, file: pngFile() });
+
+    const { rows } = await listDepositsForAdmin({ search: user.email });
+    assert.equal(rows.length, 2);
   });
 
   it("rechaza un archivo que miente sobre su tipo", async () => {

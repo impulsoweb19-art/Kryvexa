@@ -25,16 +25,29 @@ import type { SessionUser } from "@/lib/session";
  *     con índice UNIQUE. Aunque el paso 1 fallara, el dinero no se duplica.
  */
 
+function findByIdempotencyKey(key: string) {
+  return db.select().from(depositRequests).where(eq(depositRequests.idempotencyKey, key)).limit(1);
+}
+
 export async function createDeposit(input: {
   userId: string;
   amountCents: number;
   operationCode?: string;
+  /** Identifica un envío del formulario; ver el comentario en el esquema. */
+  idempotencyKey?: string;
   file: File;
 }) {
+  // Atajo barato: si este envío ya se registró, se devuelve tal cual y ni
+  // siquiera se vuelve a subir el comprobante.
+  if (input.idempotencyKey) {
+    const [existing] = await findByIdempotencyKey(input.idempotencyKey);
+    if (existing) return existing;
+  }
+
   const receipt = await storeReceipt(input.file);
   await ensureWallet(input.userId);
 
-  const [deposit] = await db
+  const inserted = await db
     .insert(depositRequests)
     .values({
       code: humanCode("DEP"),
@@ -45,8 +58,22 @@ export async function createDeposit(input: {
       receiptMime: receipt.mime,
       receiptSize: receipt.size,
       status: "PENDING",
+      idempotencyKey: input.idempotencyKey ?? null,
     })
+    // Sin clave, `idempotencyKey` va NULL y en Postgres los NULL no chocan
+    // entre sí: las peticiones antiguas siguen creando su solicitud igual.
+    .onConflictDoNothing({ target: depositRequests.idempotencyKey })
     .returning();
+
+  if (!inserted[0]) {
+    // Dos envíos con la misma clave a la vez: gana uno solo. El otro devuelve
+    // la solicitud ya creada SIN volver a sumar el pendiente.
+    const [existing] = await findByIdempotencyKey(input.idempotencyKey!);
+    if (existing) return existing;
+    throw new AppError("CONFLICT", { userMessage: "No pudimos registrar tu solicitud. Inténtalo de nuevo." });
+  }
+
+  const deposit = inserted[0];
 
   await db.transaction(async (tx) => {
     await adjustPending(tx, input.userId, input.amountCents);

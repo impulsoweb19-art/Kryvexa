@@ -202,11 +202,28 @@ export const depositRequests = pgTable(
     rejectionReason: text("rejection_reason"),
     reviewedById: text("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    /**
+     * Identifica UN envío del formulario, para que reintentarlo no cree dos
+     * solicitudes por el mismo pago.
+     *
+     * Hace falta porque el navegador puede no llegar a ver la respuesta aunque
+     * el servidor sí haya creado la solicitud (pasó el 14/9/2026: el registro
+     * quedó con 201 y al usuario se le mostró un error de red). Sin esto, quien
+     * reintenta genera una segunda solicitud idéntica, y aprobar las dos
+     * acredita el doble por un solo pago de Yape.
+     *
+     * Admite NULL a propósito: las solicitudes anteriores a este cambio no la
+     * tienen, y un navegador con la página abierta desde antes del despliegue
+     * tampoco la envía. En Postgres los NULL no chocan entre sí en un índice
+     * único, así que esas siguen funcionando como siempre.
+     */
+    idempotencyKey: varchar("idempotency_key", { length: 64 }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex("deposit_requests_code_key").on(t.code),
+    uniqueIndex("deposit_requests_idempotency_key").on(t.idempotencyKey),
     index("deposit_requests_status_idx").on(t.status, t.createdAt),
     index("deposit_requests_user_idx").on(t.userId, t.createdAt),
   ],

@@ -114,6 +114,12 @@ export const depositAmountSchema = z
 export const createDepositSchema = z.object({
   amountCents: depositAmountSchema,
   operationCode: cleanString(40).optional(),
+  /**
+   * Opcional a propósito: un navegador con la página abierta desde antes del
+   * despliegue no la envía, y rechazarlo por eso sería dejarlo sin poder
+   * recargar. Sin clave, la solicitud se crea como siempre.
+   */
+  idempotencyKey: z.string().uuid("Clave de idempotencia inválida").optional(),
 });
 
 export const rejectDepositSchema = z.object({

@@ -29,9 +29,28 @@ const MAX_BYTES = 4 * 1024 * 1024;
 /** Ni se intenta comprimir algo así de grande: primero se avisa. */
 const ABSURDLY_LARGE_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Identifica UN pago concreto, para que reintentarlo —a mano o
+ * automáticamente— no cree dos solicitudes por el mismo depósito.
+ *
+ * Se mantiene igual mientras el usuario reintente lo mismo, y se renueva en
+ * cuanto cambia el monto o el archivo (ahí ya es otro pago distinto) o cuando
+ * el envío sale bien.
+ */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Navegadores viejos: mismo formato, generado a mano.
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+    (Number(c) ^ (Math.floor(Math.random() * 256) & (15 >> (Number(c) / 4)))).toString(16),
+  );
+}
+
 export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
+  const idempotencyKey = useRef<string>(newIdempotencyKey());
 
   const [amountCents, setAmountCents] = useState<number>(QUICK_AMOUNTS[1]);
   const [customAmount, setCustomAmount] = useState("");
@@ -44,6 +63,7 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
     setAmountCents(cents);
     setCustomAmount("");
     setError(null);
+    idempotencyKey.current = newIdempotencyKey(); // otro monto = otro pago
   }
 
   function onCustom(value: string) {
@@ -51,6 +71,7 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
     const parsed = Number(value.replace(",", "."));
     if (Number.isFinite(parsed) && parsed > 0) setAmountCents(Math.round(parsed * 100));
     setError(null);
+    idempotencyKey.current = newIdempotencyKey();
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -68,6 +89,7 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
 
     const body = new FormData(e.currentTarget);
     body.set("amountCents", String(amountCents));
+    body.set("idempotencyKey", idempotencyKey.current);
 
     setLoading(true);
     try {
@@ -80,12 +102,21 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
       }
       body.set("receipt", file);
 
-      let res: Response;
-      try {
-        res = await fetch("/api/deposits", { method: "POST", body });
-      } catch {
-        // Falla de red: el navegador dice "Failed to fetch", que no le sirve
-        // de nada a quien está intentando recargar.
+      // Un reintento automático ante fallo de red. Es seguro porque va con la
+      // misma clave de idempotencia: si la primera petición sí llegó (aunque
+      // el navegador no viera la respuesta), el servidor devuelve esa misma
+      // solicitud en vez de crear una segunda por el mismo pago.
+      let res: Response | null = null;
+      for (let attempt = 0; attempt < 2 && !res; attempt++) {
+        try {
+          res = await fetch("/api/deposits", { method: "POST", body });
+        } catch {
+          if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+      if (!res) {
+        // El navegador dice "Failed to fetch", que no le sirve de nada a quien
+        // está intentando recargar.
         throw new Error("No pudimos enviar el comprobante. Revisa tu conexión e inténtalo de nuevo.");
       }
 
@@ -93,6 +124,7 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
       if (!json) throw new Error("No pudimos enviar el comprobante. Inténtalo de nuevo en un momento.");
       if (!res.ok || !json.success) throw new Error(json.error ?? "No pudimos registrar tu solicitud.");
 
+      idempotencyKey.current = newIdempotencyKey(); // el siguiente depósito es otro
       setDone({ code: json.data.code, amountCents: json.data.amountCents });
       router.refresh();
     } catch (err) {
@@ -167,7 +199,10 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
           type="file"
           accept={ACCEPTED}
           required
-          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          onChange={(e) => {
+            setFileName(e.target.files?.[0]?.name ?? null);
+            idempotencyKey.current = newIdempotencyKey(); // otro comprobante = otro pago
+          }}
           className="block w-full cursor-pointer rounded-xl border border-dashed border-line bg-abyss px-3.5 py-4 text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-sm file:text-ink hover:border-flame-500/50"
         />
       </Field>

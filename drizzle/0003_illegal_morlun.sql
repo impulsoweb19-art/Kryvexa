@@ -1,0 +1,2 @@
+ALTER TABLE "deposit_requests" ADD COLUMN "idempotency_key" varchar(64);--> statement-breakpoint
+CREATE UNIQUE INDEX "deposit_requests_idempotency_key" ON "deposit_requests" USING btree ("idempotency_key");
