@@ -25,8 +25,17 @@
 const MAX_DIMENSION = 1280;
 const QUALITY = 0.75;
 
+/** Por debajo de esto, lo comprimido no puede ser un comprobante de verdad. */
+const MIN_BYTES_RAZONABLE = 8 * 1024;
+
+interface Decodificada {
+  source: CanvasImageSource & { width: number; height: number };
+  /** Hay que llamarlo DESPUÉS de dibujar, nunca antes. */
+  liberar: () => void;
+}
+
 /** Decodifica el archivo a algo que se pueda dibujar en un canvas. */
-async function decode(file: File): Promise<CanvasImageSource & { width: number; height: number }> {
+async function decode(file: File): Promise<Decodificada> {
   // createImageBitmap es lo más rápido y no toca el DOM, pero no siempre se
   // puede usar: falta en navegadores viejos (iOS < 15) y ADEMÁS puede fallar
   // aunque exista (memoria, un JPEG que no le gusta…). Antes solo se
@@ -35,23 +44,38 @@ async function decode(file: File): Promise<CanvasImageSource & { width: number; 
   // comprobante de 802 KB saliendo sin comprimir desde un Android.
   if (typeof createImageBitmap === "function") {
     try {
-      return await createImageBitmap(file);
+      const bitmap = await createImageBitmap(file);
+      return { source: bitmap, liberar: () => bitmap.close() };
     } catch {
       // Sigue al método con <img>, que es más lento pero más tolerante.
     }
   }
 
   const url = URL.createObjectURL(file);
-  try {
-    return await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("No se pudo leer la imagen"));
-      img.src = url;
-    });
-  } finally {
-    URL.revokeObjectURL(url);
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    el.src = url;
+  });
+
+  // `onload` avisa de que terminó de DESCARGARSE, no de que esté lista para
+  // dibujar. Sin esperar a que decodifique —y liberando la URL antes de
+  // tiempo, como se hacía— algunos Android dibujaban un lienzo vacío: el
+  // comprobante llegaba completamente en blanco (visto el 16/9/2026).
+  if (typeof img.decode === "function") {
+    await img.decode().catch(() => undefined);
   }
+
+  return {
+    // naturalWidth es el tamaño real del archivo; `width` puede venir de la
+    // maquetación si el elemento llega a insertarse en la página.
+    source: Object.assign(img, {
+      width: img.naturalWidth || img.width,
+      height: img.naturalHeight || img.height,
+    }),
+    liberar: () => URL.revokeObjectURL(url),
+  };
 }
 
 export async function compressImage(file: File): Promise<File> {
@@ -60,7 +84,9 @@ export async function compressImage(file: File): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
 
   try {
-    const source = await decode(file);
+    const { source, liberar } = await decode(file);
+    if (!source.width || !source.height) return file;
+
     const scale = Math.min(1, MAX_DIMENSION / Math.max(source.width, source.height));
 
     const canvas = document.createElement("canvas");
@@ -76,15 +102,23 @@ export async function compressImage(file: File): Promise<File> {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
 
-    if ("close" in source && typeof source.close === "function") source.close();
-
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", QUALITY),
     );
 
+    liberar(); // recién ahora: antes de dibujar dejaba el lienzo en blanco
+
     // Una captura ya pequeña puede salir MÁS pesada al recomprimirla; en ese
     // caso el original es la mejor versión.
     if (!blob || blob.size >= file.size) return file;
+
+    /**
+     * Red de seguridad: un comprobante real, aunque sea sencillo, nunca baja
+     * de unos pocos KB. Un resultado ridículamente pequeño significa que el
+     * lienzo salió vacío, y subir eso es peor que subir la foto original: el
+     * administrador recibe una imagen en blanco y no puede verificar el pago.
+     */
+    if (blob.size < MIN_BYTES_RAZONABLE) return file;
 
     return new File([blob], "comprobante.jpg", { type: "image/jpeg" });
   } catch {
