@@ -35,6 +35,9 @@ const GAME_FILTERS: Record<string, RegExp> = {
 
 export interface StoreProduct {
   id: string;
+  /** Los usa `store-categories` para agrupar; no se muestran en pantalla. */
+  providerCode: string;
+  externalId: string;
   gameName: string;
   packageName: string;
   kind: Product["kind"];
@@ -86,6 +89,8 @@ export function sellPriceCents(product: Product, config: StoreConfig): number {
 export function toStoreProduct(product: Product, config: StoreConfig): StoreProduct {
   return {
     id: product.id,
+    providerCode: product.providerCode,
+    externalId: product.externalId,
     gameName: product.gameName,
     packageName: product.packageName,
     kind: product.kind,
