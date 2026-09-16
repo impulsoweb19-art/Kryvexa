@@ -197,8 +197,7 @@ export function CatalogManager({
         <div>
           <h2 className="font-bold">Sincronización con el proveedor</h2>
           <p className="mt-1 text-sm text-muted">
-            Trae los paquetes desde <code className="text-plasma-400">/products/games</code> y{" "}
-            <code className="text-plasma-400">/products/pins</code>. Tus ajustes de precio,
+            Trae los paquetes desde el catálogo de cada proveedor. Tus ajustes de precio,
             visibilidad y orden se conservan.
           </p>
           <p className="mt-1 text-xs text-faint">
