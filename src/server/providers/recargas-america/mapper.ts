@@ -153,10 +153,23 @@ export function mapProviderStatus(status: unknown): ProviderOrderStatus {
 
 // ── Mapeos ───────────────────────────────────────────────────────────────────
 
-/** Extrae el juego del nombre plano ("Free Fire 1060 Diamonds" → "Free Fire"). */
+/**
+ * Extrae el juego del nombre plano ("Recarga Free Fire - 1060 Diamantes" →
+ * "Free Fire").
+ *
+ * Busca en TODO el nombre, no solo al principio: los del catálogo real
+ * empiezan por "Recarga", "Pin" o "Tarjeta", y anclando al inicio salía
+ * "Recarga Free" como nombre de juego —que es lo que hoy se ve en el panel—.
+ */
 function guessGameName(name: string): string {
-  const m = /^(free\s*fire|mobile\s*legends|pubg\s*mobile|call\s*of\s*duty)/i.exec(name ?? "");
-  return m ? m[1].replace(/\s+/g, " ") : (name ?? "Producto").split(" ").slice(0, 2).join(" ");
+  const m = /(free\s*fire|mobile\s*legends|pubg\s*mobile|call\s*of\s*duty)/i.exec(name ?? "");
+  if (!m) return (name ?? "Producto").split(" ").slice(0, 2).join(" ");
+
+  // Capitaliza cada palabra: el proveedor mezcla "Free fire" y "Free Fire".
+  return m[1]
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -168,7 +181,10 @@ const CATALOG_FIELD_LABELS: Record<string, { label: string; type: "text" | "numb
   player_id: { label: "ID de jugador", type: "number" },
   zone_id: { label: "ID de zona", type: "number" },
   server_id: { label: "ID de servidor", type: "number" },
-  manual_id: { label: "ID de cuenta", type: "text" },
+  // El catálogo real pide `manual_id` en las recargas de Free Fire, y lo que
+  // espera ahí es el ID del jugador. Llamarlo "ID de cuenta" confundiría a
+  // quien compra.
+  manual_id: { label: "ID de jugador", type: "number" },
   username: { label: "Usuario", type: "text" },
 };
 
