@@ -16,15 +16,29 @@
  * original: comprimir es una mejora, nunca un requisito para poder enviar.
  */
 
-const MAX_DIMENSION = 1600;
-const QUALITY = 0.82;
+/**
+ * 1280 px y calidad 0.75 dejan un comprobante de Yape en torno a 100-200 KB,
+ * perfectamente legible. Se bajó desde 1600/0.82 porque el problema real no
+ * era el límite del servidor sino la subida en sí: con datos móviles, cuanto
+ * más pequeño es el envío, más probable es que llegue entero.
+ */
+const MAX_DIMENSION = 1280;
+const QUALITY = 0.75;
 
 /** Decodifica el archivo a algo que se pueda dibujar en un canvas. */
 async function decode(file: File): Promise<CanvasImageSource & { width: number; height: number }> {
-  // createImageBitmap es lo más rápido y no toca el DOM, pero falta en
-  // navegadores viejos (iOS < 15), así que ahí caemos a un <img> normal.
+  // createImageBitmap es lo más rápido y no toca el DOM, pero no siempre se
+  // puede usar: falta en navegadores viejos (iOS < 15) y ADEMÁS puede fallar
+  // aunque exista (memoria, un JPEG que no le gusta…). Antes solo se
+  // contemplaba lo primero, así que cuando fallaba se abandonaba la compresión
+  // y se subía la foto entera: justo lo que se vio el 16/9/2026, un
+  // comprobante de 802 KB saliendo sin comprimir desde un Android.
   if (typeof createImageBitmap === "function") {
-    return await createImageBitmap(file);
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // Sigue al método con <img>, que es más lento pero más tolerante.
+    }
   }
 
   const url = URL.createObjectURL(file);
