@@ -37,6 +37,36 @@ const ABSURDLY_LARGE_BYTES = 25 * 1024 * 1024;
  * cuanto cambia el monto o el archivo (ahí ya es otro pago distinto) o cuando
  * el envío sale bien.
  */
+/**
+ * Cuenta al servidor por qué falló la subida. Nunca lanza: es diagnóstico, no
+ * parte del flujo de compra.
+ */
+async function reportarFallo(datos: {
+  detalle: string;
+  original: number;
+  enviado: number;
+  tipo: string;
+}): Promise<void> {
+  try {
+    const conexion = (navigator as { connection?: { effectiveType?: string } }).connection;
+    await fetch("/api/client-errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        contexto: "deposito.subida",
+        detalle:
+          `${datos.detalle} | original ${Math.round(datos.original / 1024)}KB ` +
+          `(${datos.tipo || "sin tipo"}) → enviado ${Math.round(datos.enviado / 1024)}KB ` +
+          `| red ${conexion?.effectiveType ?? "?"}`,
+      }),
+    });
+  } catch {
+    // Si ni esto sale, ya es información: ese navegador no logra hablar con
+    // nuestro servidor en absoluto.
+  }
+}
+
 function newIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -107,12 +137,27 @@ export function DepositForm({ minDepositCents }: { minDepositCents: number }) {
       // el navegador no viera la respuesta), el servidor devuelve esa misma
       // solicitud en vez de crear una segunda por el mismo pago.
       let res: Response | null = null;
+      let ultimoFallo = "";
       for (let attempt = 0; attempt < 2 && !res; attempt++) {
         try {
           res = await fetch("/api/deposits", { method: "POST", body });
-        } catch {
+        } catch (e) {
+          ultimoFallo = `${(e as Error)?.name ?? "?"}: ${(e as Error)?.message ?? "?"}`;
           if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
         }
+      }
+
+      if (!res) {
+        // Estos fallos no dejan rastro en el servidor —la petición nunca llega—
+        // así que el único modo de saber qué pasó es que lo cuente el propio
+        // navegador. Se manda "a la buena de Dios": si también se pierde, mala
+        // suerte, pero no puede romper el flujo del comprador.
+        void reportarFallo({
+          detalle: ultimoFallo,
+          original: original.size,
+          enviado: file.size,
+          tipo: original.type,
+        });
       }
       if (!res) {
         // El navegador dice "Failed to fetch", que no le sirve de nada a quien
