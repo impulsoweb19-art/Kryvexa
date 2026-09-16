@@ -83,14 +83,16 @@ export async function createTestProduct(overrides: Partial<typeof products.$infe
     .values({
       providerCode: "recargas_america",
       externalId: `test-${Date.now()}-${counter}`,
-      kind: "GAME_PACKAGE",
-      gameName: "Free Fire (MY)",
-      packageName: "100 Diamonds",
+      // Desde el catálogo unificado los productos son RECHARGE y sus campos
+      // llevan los nombres canónicos del proveedor (player_id, zone_id…).
+      kind: "RECHARGE",
+      gameName: "Free Fire",
+      packageName: "100 Diamantes",
       costUsdCents: 374,
       priceCents: 1780, // precio fijo: aísla la prueba del tipo de cambio
       inputFields: [
-        { name: "input1", label: "Player ID" },
-        { name: "input2", label: "Server ID" },
+        { name: "player_id", label: "ID de jugador" },
+        { name: "zone_id", label: "ID de zona" },
       ] as never,
       validationSupported: false,
       active: true,

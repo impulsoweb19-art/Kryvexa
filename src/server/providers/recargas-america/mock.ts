@@ -1,4 +1,11 @@
-import type { RawGameProduct, RawOrder, RawPinProduct, RawValidate, RawWallet } from "./mapper";
+import type {
+  RawCatalogProduct,
+  RawCatalogValidate,
+  RawGameProduct,
+  RawOrder,
+  RawPinProduct,
+  RawWallet,
+} from "./mapper";
 
 /**
  * MODO SIMULADO (`PROVIDER_MOCK=true`).
@@ -43,10 +50,31 @@ export const mockPinProducts: RawPinProduct[] = [
   { id: 21, sku: "FFCH1060", name: "Free Fire 1060 Diamonds", type: "pin", price: 12.5 },
 ];
 
-/** Un ID que empieza por "9" se considera inexistente: sirve para probar el error. */
-export function mockValidate(serviceUserId: string): RawValidate {
+/**
+ * Catálogo unificado (el que reemplazó a games/pins el 2026-09-20). Mismos
+ * paquetes y precios que `mockGameProducts`, pero con la forma nueva: `sku`
+ * estable, nombre plano y `required_fields` con nombres canónicos.
+ */
+export const mockCatalogProducts: RawCatalogProduct[] = [
+  { id: 101, sku: "MP-FF110", name: "Free Fire 110 Diamantes", type: "recharge", price: 0.79, required_fields: ["player_id"] },
+  { id: 102, sku: "MP-FF341", name: "Free Fire 341 Diamantes", type: "recharge", price: 2.24, required_fields: ["player_id"] },
+  { id: 103, sku: "MP-FF572", name: "Free Fire 572 Diamantes", type: "recharge", price: 3.61, required_fields: ["player_id"] },
+  { id: 104, sku: "MP-FF1166", name: "Free Fire 1166 Diamantes", type: "recharge", price: 6.55, required_fields: ["player_id"] },
+  { id: 105, sku: "MP-FF2398", name: "Free Fire 2398 Diamantes", type: "recharge", price: 13.13, required_fields: ["player_id"] },
+  { id: 106, sku: "MP-FF6160", name: "Free Fire 6160 Diamantes", type: "recharge", price: 32.87, required_fields: ["player_id"] },
+];
+
+/**
+ * Un ID que empieza por "9" se considera inexistente: sirve para probar el
+ * error. Uno que empieza por "8" simula un proveedor sin precheck
+ * (`supported:false`), que el catálogo unificado devuelve como "sin dato".
+ */
+export function mockValidate(serviceUserId: string): RawCatalogValidate {
+  if (serviceUserId.startsWith("8")) return { supported: false };
+
   const notFound = serviceUserId.startsWith("9");
   return {
+    supported: true,
     status: !notFound,
     account_name: notFound ? null : `Jugador${serviceUserId.slice(-4)}`,
   };
@@ -72,7 +100,9 @@ function encodeReference(createdAtMs: number): string {
 }
 
 function decodeReferenceCreatedAt(reference: string): number | null {
-  const match = /^MOCK([0-9A-Z]+)REF$/.exec(reference);
+  // El catálogo unificado antepone "RAAPI-MP-" a la referencia; se ignora para
+  // que la conciliación simulada siga funcionando igual que con la API vieja.
+  const match = /^(?:RAAPI-MP-)?MOCK([0-9A-Z]+)REF$/.exec(reference);
   if (!match) return null;
   const ms = parseInt(match[1], 36);
   return Number.isFinite(ms) ? ms : null;
@@ -99,6 +129,31 @@ export function mockBuyGames(packageId: string, inputs: Record<string, string>) 
     amount_charged: product?.price ?? 0,
     item: status === "COMPLETED" ? `${product?.game} ${product?.package}` : null,
     pins: [],
+  };
+}
+
+/**
+ * POST /buy/catalog simulado. Mismos disparadores por último dígito del ID de
+ * jugador que `mockBuyGames`, más `PROCESSING_PROVIDER` cuando termina en "5",
+ * que es el estado nuevo del catálogo unificado (proveedor asíncrono).
+ */
+export function mockBuyCatalog(productId: string, inputs: Record<string, string>) {
+  const playerId = inputs.player_id ?? "";
+  const product = mockCatalogProducts.find((p) => String(p.id) === productId);
+  const status = playerId.endsWith("0")
+    ? "PENDING"
+    : playerId.endsWith("1")
+      ? "FAILED"
+      : playerId.endsWith("5")
+        ? "PROCESSING_PROVIDER"
+        : "COMPLETED";
+
+  return {
+    transaction_id: Date.now(),
+    order_id: `RAAPI-MP-${encodeReference(Date.now())}`,
+    status,
+    amount_charged: product?.price ?? 0,
+    item: status === "COMPLETED" ? (product?.name ?? null) : null,
   };
 }
 

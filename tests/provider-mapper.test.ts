@@ -1,10 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  mapBuyGames,
-  mapBuyPins,
-  mapGameProduct,
-  mapPinProduct,
+  mapBuyCatalog,
+  mapCatalogProduct,
   mapProviderStatus,
   priceToUsdCents,
 } from "@/server/providers/recargas-america/mapper";
@@ -12,6 +10,10 @@ import {
 /**
  * Estas pruebas fijan el contrato con la API documentada. Si el proveedor
  * cambia una forma, aquí es donde debe romperse: no en producción.
+ *
+ * Desde el 2026-09-20 el proveedor sirve todo por el catálogo unificado
+ * (/products/catalog + /buy/catalog); los endpoints por tipo de producto
+ * quedaron apagados.
  */
 describe("mapeo de RecargasAmérica", () => {
   it("traduce los estados del proveedor a los nuestros", () => {
@@ -19,6 +21,12 @@ describe("mapeo de RecargasAmérica", () => {
     assert.equal(mapProviderStatus("PENDING"), "PENDING");
     assert.equal(mapProviderStatus("FAILED"), "FAILED");
     assert.equal(mapProviderStatus("completed"), "COMPLETED");
+  });
+
+  it("trata PROCESSING_PROVIDER como una orden todavía viva", () => {
+    // Lo devuelve el catálogo unificado cuando el proveedor que gana la compra
+    // es asíncrono. Darlo por fallido reembolsaría una recarga que sí va a salir.
+    assert.equal(mapProviderStatus("PROCESSING_PROVIDER"), "PENDING");
   });
 
   it("marca como UNKNOWN cualquier estado no reconocido", () => {
@@ -34,65 +42,72 @@ describe("mapeo de RecargasAmérica", () => {
     assert.throws(() => priceToUsdCents("no-numero"));
   });
 
-  it("mapea un paquete de juego con sus input_fields", () => {
-    const product = mapGameProduct({
+  it("mapea un producto del catálogo conservando los nombres canónicos", () => {
+    const product = mapCatalogProduct({
       id: 1,
-      game: "Free Fire (MY)",
-      package: "100 Diamonds",
-      price: 3.74,
-      input_fields: [
-        { name: "input1", label: "Player ID" },
-        { name: "input2", label: "Server ID" },
-      ],
+      sku: "MP-FF100",
+      name: "Free Fire 100 Diamantes",
+      type: "recharge",
+      price: 1.15,
+      required_fields: ["player_id"],
     });
 
     assert.equal(product.externalId, "1");
-    assert.equal(product.kind, "GAME_PACKAGE");
-    assert.equal(product.costUsdCents, 374);
+    assert.equal(product.sku, "MP-FF100");
+    assert.equal(product.kind, "RECHARGE");
+    assert.equal(product.costUsdCents, 115);
+    assert.equal(product.gameName, "Free Fire");
+    assert.equal(product.validationSupported, true);
+
+    // El nombre del campo viaja tal cual a /buy/catalog: si se tradujera a
+    // "input1", el proveedor no sabría qué es.
     assert.deepEqual(
       product.inputFields.map((f) => f.name),
-      ["input1", "input2"],
+      ["player_id"],
     );
-    // La API NO documenta validación previa para /products/games.
-    assert.equal(product.validationSupported, false);
+    assert.equal(product.inputFields[0].label, "ID de jugador");
   });
 
-  it("solo habilita la validación en productos type=recharge", () => {
-    const recharge = mapPinProduct({ id: 20, name: "Free Fire Recarga", type: "recharge", price: 4.1 });
-    const pin = mapPinProduct({ id: 21, name: "Free Fire 1060 Diamonds", type: "pin", price: 12.5 });
+  it("mapea varios campos requeridos en el orden que los declara la API", () => {
+    const product = mapCatalogProduct({
+      id: 2,
+      name: "Mobile Legends 100 Diamantes",
+      type: "recharge",
+      price: 1.5,
+      required_fields: ["player_id", "zone_id"],
+    });
 
-    assert.equal(recharge.kind, "RECHARGE");
-    assert.equal(recharge.validationSupported, true);
-    assert.equal(recharge.inputFields[0].name, "redemption_id");
-
-    assert.equal(pin.kind, "PIN");
-    assert.equal(pin.validationSupported, false);
+    assert.deepEqual(
+      product.inputFields.map((f) => f.name),
+      ["player_id", "zone_id"],
+    );
   });
 
-  it("asume type=pin cuando la API omite el campo", () => {
-    const product = mapPinProduct({ id: 30, name: "Free Fire 100", price: 3 });
+  it("un PIN sin campos requeridos se compra por cantidad", () => {
+    const product = mapCatalogProduct({ id: 3, name: "Free Fire 1060", type: "pin", price: 12.5 });
+
     assert.equal(product.kind, "PIN");
+    assert.equal(product.validationSupported, false);
+    assert.equal(product.inputFields[0].name, "quantity");
   });
 
-  it("lee la referencia de una compra PENDING", () => {
-    const result = mapBuyGames({
-      transaction_id: 43,
-      reference: "38094W09IPOKW",
-      status: "PENDING",
-      amount_charged: 3.74,
+  it("asume recarga cuando la API omite el tipo", () => {
+    const product = mapCatalogProduct({ id: 4, name: "Free Fire 100", price: 3 });
+    assert.equal(product.kind, "RECHARGE");
+  });
+
+  it("guarda el order_id de la compra como referencia para conciliar", () => {
+    const result = mapBuyCatalog({
+      transaction_id: 50,
+      order_id: "RAAPI-MP-50-9F2A",
+      status: "PROCESSING_PROVIDER",
+      amount_charged: 1.15,
       item: null,
-      pins: [],
     });
 
     assert.equal(result.status, "PENDING");
-    assert.equal(result.reference, "38094W09IPOKW");
-    assert.equal(result.chargedUsdCents, 374);
-  });
-
-  it("trata /buy/pins sin status como entregado", () => {
-    // El endpoint documentado responde sin `status`: success:true = entregado.
-    const result = mapBuyPins({ transaction_id: 44, amount_charged: 25.0, api_data: {} });
-    assert.equal(result.status, "COMPLETED");
-    assert.equal(result.chargedUsdCents, 2500);
+    // El catálogo llama `order_id` a lo que antes era `reference`.
+    assert.equal(result.reference, "RAAPI-MP-50-9F2A");
+    assert.equal(result.chargedUsdCents, 115);
   });
 });

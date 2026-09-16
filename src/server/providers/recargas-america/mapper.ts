@@ -65,6 +65,39 @@ export interface RawValidate {
   account_name: string | null;
 }
 
+/**
+ * GET /products/catalog — el catálogo unificado que reemplaza a
+ * /products/games y /products/pins desde el 2026-09-20.
+ *
+ * Su `id`/`sku` no cambia aunque el proveedor que cumple la compra sí lo haga;
+ * por eso sustituye a los IDs viejos, que eran por proveedor.
+ */
+export interface RawCatalogProduct {
+  id: number | string;
+  sku?: string;
+  name: string;
+  type?: string;
+  price: number;
+  /** Nombres canónicos: player_id, zone_id, manual_id, server_id, username. */
+  required_fields?: string[];
+}
+
+/** POST /buy/catalog. No trae `reference`, sino `order_id`. */
+export interface RawBuyCatalog {
+  transaction_id?: number | string;
+  order_id?: string;
+  status?: string;
+  amount_charged?: number;
+  item?: string | null;
+}
+
+/** POST /catalog/validate. `supported:false` = el proveedor ganador no hace precheck. */
+export interface RawCatalogValidate {
+  supported?: boolean;
+  status?: boolean;
+  account_name?: string | null;
+}
+
 export interface RawOrder {
   transaction_id?: number | string;
   reference?: string;
@@ -103,6 +136,10 @@ export function mapProviderStatus(status: unknown): ProviderOrderStatus {
     case "PROCESSING":
     case "IN_PROGRESS":
       return "PENDING";
+    case "PROCESSING_PROVIDER":
+      // El catálogo unificado lo devuelve cuando el proveedor que gana la
+      // compra es asíncrono: la orden sigue viva, no ha fallado.
+      return "PENDING";
     case "FAILED":
     case "ERROR":
     case "CANCELLED":
@@ -114,69 +151,7 @@ export function mapProviderStatus(status: unknown): ProviderOrderStatus {
   }
 }
 
-/**
- * Detecta si un producto de /products/pins es de tipo recarga.
- * Solo estos admiten el precheck POST /pins/validate (documentado).
- */
-export function pinKind(raw: RawPinProduct): ProductKind {
-  return String(raw.type ?? "pin").toLowerCase() === "recharge" ? "RECHARGE" : "PIN";
-}
-
-function normalizeInputFields(fields: RawGameProduct["input_fields"]): ProviderInputField[] {
-  if (!Array.isArray(fields) || fields.length === 0) {
-    // La API es la fuente de verdad. Si no declara campos, no inventamos ninguno:
-    // la UI mostrará un aviso y el admin deberá revisar el producto.
-    return [];
-  }
-  return fields
-    .filter((f) => f && typeof f.name === "string")
-    .map((f) => ({
-      name: f.name,
-      label: typeof f.label === "string" && f.label.trim() ? f.label : f.name,
-      // Los IDs de jugador de Free Fire son numéricos: mejor teclado en móvil.
-      type: /id$/i.test(f.label ?? "") ? "number" : "text",
-      placeholder: undefined,
-    }));
-}
-
 // ── Mapeos ───────────────────────────────────────────────────────────────────
-
-export function mapGameProduct(raw: RawGameProduct): ProviderProduct {
-  return {
-    externalId: String(raw.id),
-    kind: "GAME_PACKAGE",
-    sku: null,
-    gameName: raw.game ?? "Desconocido",
-    packageName: raw.package ?? "Paquete",
-    costUsdCents: priceToUsdCents(raw.price),
-    inputFields: normalizeInputFields(raw.input_fields),
-    // La documentación limita POST /pins/validate a productos de /products/pins
-    // con type=recharge. Para los paquetes de juego NO hay validación documentada.
-    validationSupported: false,
-    active: true,
-    raw,
-  };
-}
-
-export function mapPinProduct(raw: RawPinProduct): ProviderProduct {
-  const kind = pinKind(raw);
-  return {
-    externalId: String(raw.id),
-    kind,
-    sku: raw.sku ?? null,
-    // /products/pins no separa juego y paquete: usamos el nombre completo.
-    gameName: guessGameName(raw.name),
-    packageName: raw.name,
-    costUsdCents: priceToUsdCents(raw.price),
-    inputFields:
-      kind === "RECHARGE"
-        ? [{ name: "redemption_id", label: "ID de jugador", type: "number" }]
-        : [{ name: "quantity", label: "Cantidad", type: "number" }],
-    validationSupported: kind === "RECHARGE",
-    active: true,
-    raw,
-  };
-}
 
 /** Extrae el juego del nombre plano ("Free Fire 1060 Diamonds" → "Free Fire"). */
 function guessGameName(name: string): string {
@@ -184,29 +159,63 @@ function guessGameName(name: string): string {
   return m ? m[1].replace(/\s+/g, " ") : (name ?? "Producto").split(" ").slice(0, 2).join(" ");
 }
 
-export function mapBuyGames(raw: RawBuyGames): PurchaseResult {
+/**
+ * Etiquetas de los campos canónicos del catálogo unificado. El `name` se
+ * conserva tal cual porque es lo que espera /buy/catalog; aquí solo se le pone
+ * un texto entendible para el comprador.
+ */
+const CATALOG_FIELD_LABELS: Record<string, { label: string; type: "text" | "number" }> = {
+  player_id: { label: "ID de jugador", type: "number" },
+  zone_id: { label: "ID de zona", type: "number" },
+  server_id: { label: "ID de servidor", type: "number" },
+  manual_id: { label: "ID de cuenta", type: "text" },
+  username: { label: "Usuario", type: "text" },
+};
+
+export function catalogKind(raw: RawCatalogProduct): ProductKind {
+  return String(raw.type ?? "recharge").toLowerCase() === "pin" ? "PIN" : "RECHARGE";
+}
+
+export function mapCatalogProduct(raw: RawCatalogProduct): ProviderProduct {
+  const kind = catalogKind(raw);
+  const required = Array.isArray(raw.required_fields) ? raw.required_fields : [];
+
+  // Un PIN no pide datos del jugador: se compra por cantidad.
+  const inputFields: ProviderInputField[] =
+    kind === "PIN" && required.length === 0
+      ? [{ name: "quantity", label: "Cantidad", type: "number" }]
+      : required.map((name) => {
+          const known = CATALOG_FIELD_LABELS[name];
+          return { name, label: known?.label ?? name, type: known?.type ?? "text" };
+        });
+
   return {
-    status: mapProviderStatus(raw.status),
-    reference: asString(raw.reference),
-    transactionId: asString(raw.transaction_id),
-    chargedUsdCents: raw.amount_charged !== undefined ? priceToUsdCents(raw.amount_charged) : null,
-    item: raw.item ?? null,
-    pins: Array.isArray(raw.pins) ? raw.pins.map(String) : [],
+    externalId: String(raw.id),
+    kind,
+    sku: raw.sku ?? null,
+    gameName: guessGameName(raw.name),
+    packageName: raw.name,
+    costUsdCents: priceToUsdCents(raw.price),
+    inputFields,
+    // /catalog/validate acepta cualquier producto, pero responde
+    // `supported:false` si el proveedor ganador no hace precheck. Se ofrece
+    // solo en recargas; el adaptador trata esa respuesta como "sin dato".
+    validationSupported: kind === "RECHARGE",
+    active: true,
     raw,
   };
 }
 
-export function mapBuyPins(raw: RawBuyPins): PurchaseResult {
-  // /buy/pins no documenta `status`: una respuesta success:true significa
-  // entregado. Si algún día empieza a devolver status, lo respetamos.
-  const status = raw.status ? mapProviderStatus(raw.status) : "COMPLETED";
+export function mapBuyCatalog(raw: RawBuyCatalog): PurchaseResult {
   return {
-    status,
-    reference: asString(raw.reference),
+    status: mapProviderStatus(raw.status),
+    // El catálogo llama `order_id` a lo que el endpoint viejo llamaba
+    // `reference`. Es lo que guardamos para poder conciliar después.
+    reference: asString(raw.order_id),
     transactionId: asString(raw.transaction_id),
     chargedUsdCents: raw.amount_charged !== undefined ? priceToUsdCents(raw.amount_charged) : null,
-    item: null,
-    pins: Array.isArray(raw.pins) ? raw.pins.map(String) : [],
+    item: raw.item ?? null,
+    pins: [],
     raw,
   };
 }

@@ -41,6 +41,12 @@ interface RequestOptions {
   orderId?: string;
   /** Timeout específico; por defecto el de la variable de entorno. */
   timeoutMs?: number;
+  /**
+   * Va como header `Idempotency-Key`. El proveedor garantiza que reenviar la
+   * misma clave devuelve 409 DUPLICATE_REQUEST en vez de cobrar y entregar dos
+   * veces — la red de seguridad para cuando no sabemos si una compra llegó.
+   */
+  idempotencyKey?: string;
 }
 
 function config() {
@@ -133,6 +139,7 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
         Accept: "application/json",
         "Content-Type": "application/json",
         Authorization: `Bearer ${c.apiKey}`,
+        ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
       },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,

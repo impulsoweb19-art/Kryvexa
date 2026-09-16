@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 /**
  * Pruebas del motor de compra con el proveedor en modo simulado.
  *
- * Convención del mock (ver mock.ts): un Player ID terminado en "0" devuelve
+ * Convención del mock (ver mock.ts): un player_id terminado en "0" devuelve
  * PENDING; el resto se completan al instante.
  */
 describe("motor de órdenes", () => {
@@ -19,7 +19,7 @@ describe("motor de órdenes", () => {
     const { order } = await createOrder({
       user,
       productId: product.id,
-      inputs: { input1: "123456789", input2: "3001" },
+      inputs: { player_id: "123456789", zone_id: "3001" },
       expectedPriceCents: 1780,
       idempotencyKey: randomUUID(),
     });
@@ -37,7 +37,7 @@ describe("motor de órdenes", () => {
     const payload = {
       user,
       productId: product.id,
-      inputs: { input1: "123456789", input2: "3001" },
+      inputs: { player_id: "123456789", zone_id: "3001" },
       expectedPriceCents: 1780,
       idempotencyKey: key,
     };
@@ -58,7 +58,7 @@ describe("motor de órdenes", () => {
     const payload = {
       user,
       productId: product.id,
-      inputs: { input1: "123456789", input2: "3001" },
+      inputs: { player_id: "123456789", zone_id: "3001" },
       expectedPriceCents: 1780,
       idempotencyKey: key,
     };
@@ -79,7 +79,7 @@ describe("motor de órdenes", () => {
       createOrder({
         user,
         productId: product.id,
-        inputs: { input1: "123456789", input2: "3001" },
+        inputs: { player_id: "123456789", zone_id: "3001" },
         expectedPriceCents: 1780,
         idempotencyKey: randomUUID(),
       }),
@@ -99,7 +99,7 @@ describe("motor de órdenes", () => {
       createOrder({
         user,
         productId: product.id,
-        inputs: { input1: "123456789", input2: "3001" },
+        inputs: { player_id: "123456789", zone_id: "3001" },
         expectedPriceCents: 1, // "un céntimo, por favor"
         idempotencyKey: randomUUID(),
       }),
@@ -117,7 +117,7 @@ describe("motor de órdenes", () => {
       createOrder({
         user,
         productId: product.id,
-        inputs: { input1: "123456789" }, // falta input2 (Server ID)
+        inputs: { player_id: "123456789" }, // falta zone_id
         expectedPriceCents: 1780,
         idempotencyKey: randomUUID(),
       }),
@@ -135,7 +135,7 @@ describe("motor de órdenes", () => {
       createOrder({
         user,
         productId: product.id,
-        inputs: { input1: "123456789", input2: "3001", input9: "inyectado" },
+        inputs: { player_id: "123456789", zone_id: "3001", input9: "inyectado" },
         expectedPriceCents: 1780,
         idempotencyKey: randomUUID(),
       }),
@@ -150,7 +150,7 @@ describe("motor de órdenes", () => {
     const { order } = await createOrder({
       user,
       productId: product.id,
-      inputs: { input1: "123456780", input2: "3001" }, // termina en 0 → PENDING
+      inputs: { player_id: "123456780", zone_id: "3001" }, // termina en 0 → PENDING
       expectedPriceCents: 1780,
       idempotencyKey: randomUUID(),
     });
@@ -168,7 +168,7 @@ describe("motor de órdenes", () => {
     const { order } = await createOrder({
       user,
       productId: product.id,
-      inputs: { input1: "123456781", input2: "3001" }, // termina en 1 → FAILED
+      inputs: { player_id: "123456781", zone_id: "3001" }, // termina en 1 → FAILED
       expectedPriceCents: 1780,
       idempotencyKey: randomUUID(),
     });
@@ -186,7 +186,7 @@ describe("motor de órdenes", () => {
     const { order } = await createOrder({
       user,
       productId: product.id,
-      inputs: { input1: "123456789", input2: "3001" },
+      inputs: { player_id: "123456789", zone_id: "3001" },
       expectedPriceCents: 1780,
       idempotencyKey: randomUUID(),
     });
@@ -207,7 +207,7 @@ describe("motor de órdenes", () => {
       createOrder({
         user,
         productId: product.id,
-        inputs: { input1: "123456789", input2: "3001" },
+        inputs: { player_id: "123456789", zone_id: "3001" },
         expectedPriceCents: 1780,
         idempotencyKey: randomUUID(),
       }),

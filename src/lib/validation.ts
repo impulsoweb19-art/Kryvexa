@@ -127,9 +127,22 @@ export const rejectDepositSchema = z.object({
   reason: cleanString(300).pipe(z.string().min(3, "Explica brevemente el motivo")),
 });
 
-/** Los inputs del producto son dinámicos: {"input1":"123456789","input2":"3001"} */
+/**
+ * Los inputs del producto son dinámicos: {"player_id":"123456789"}.
+ *
+ * La lista blanca cubre tres generaciones de nombres, porque conviven:
+ *   · `player_id`, `zone_id`… son los canónicos del catálogo unificado de
+ *     RecargasAmérica (migración del 2026-09-20).
+ *   · `input1..N` los usa EpinBy y los traían los endpoints viejos.
+ *   · `redemption_id` y `quantity` vienen de los productos de tipo PIN.
+ */
 export const productInputsSchema = z.record(
-  z.string().regex(/^(input[1-9][0-9]?|redemption_id|quantity)$/, "Campo no permitido"),
+  z
+    .string()
+    .regex(
+      /^(input[1-9][0-9]?|redemption_id|quantity|player_id|zone_id|server_id|manual_id|username)$/,
+      "Campo no permitido",
+    ),
   cleanString(64).pipe(z.string().min(1, "Campo obligatorio")),
 );
 

@@ -20,18 +20,14 @@ import {
   request,
 } from "./client";
 import {
-  type RawBuyGames,
-  type RawBuyPins,
-  type RawGameProduct,
+  type RawBuyCatalog,
+  type RawCatalogProduct,
+  type RawCatalogValidate,
   type RawOrder,
-  type RawPinProduct,
-  type RawValidate,
   type RawWallet,
-  mapBuyGames,
-  mapBuyPins,
-  mapGameProduct,
+  mapBuyCatalog,
+  mapCatalogProduct,
   mapOrder,
-  mapPinProduct,
   priceToUsdCents,
 } from "./mapper";
 import * as mock from "./mock";
@@ -42,14 +38,27 @@ import { logger } from "@/lib/logger";
  *
  * SOLO usa los endpoints documentados en la colección Postman:
  *   GET  /wallet
- *   GET  /products/games
- *   GET  /products/pins
- *   POST /buy/games
- *   POST /buy/pins
- *   POST /pins/validate
- *   GET  /orders/{reference}
+ *   GET  /products/catalog
+ *   POST /buy/catalog
+ *   POST /catalog/validate
+ *   GET  /orders/{referencia}
  *
- * Los endpoints de streaming existen pero quedan fuera del alcance v1.
+ * CATÁLOGO UNIFICADO (migración del 2026-09-20)
+ * ─────────────────────────────────────────────
+ * El proveedor apagó /products/games, /products/pins, /buy/games, /buy/pins y
+ * /pins/validate, y los reemplazó por un catálogo único cuyo `id`/`sku` no
+ * cambia aunque cambie el proveedor que termina cumpliendo la compra.
+ *
+ * El punto flojo de la migración es la conciliación: su documentación dice que
+ * para el catálogo «todavía no hay endpoint de consulta por referencia». Su
+ * soporte respondió que sí existe y que lo van a documentar, así que
+ * `getOrderStatus` intenta la consulta igual contra /orders/{id}: si todavía no
+ * está habilitada, responde 404 y lo tratamos como UNKNOWN (la orden sigue
+ * pendiente y la revisa una persona) en vez de dar por fallida una compra que
+ * quizá sí se entregó. El día que la habiliten, empieza a funcionar sin tocar
+ * el código.
+ *
+ * Los endpoints de streaming existen pero quedan fuera del alcance.
  */
 class RecargasAmericaService implements ProviderAdapter {
   readonly code = PROVIDER_CODE;
@@ -72,61 +81,42 @@ class RecargasAmericaService implements ProviderAdapter {
     return { balanceCents: priceToUsdCents(raw.balance), currency: raw.currency ?? "USD" };
   }
 
-  // ── Catálogo: /products/games + /products/pins ────────────────────────────
+  // ── GET /products/catalog — catálogo unificado ────────────────────────────
   async listProducts(): Promise<ProviderProduct[]> {
-    const [games, pins] = await Promise.all([this.listGameProducts(), this.listPinProducts()]);
-    return [...games, ...pins];
-  }
-
-  private async listGameProducts(): Promise<ProviderProduct[]> {
     const raw = isMock()
-      ? mock.mockGameProducts
-      : await request<RawGameProduct[]>({
-          operation: "products.games",
+      ? mock.mockCatalogProducts
+      : await request<RawCatalogProduct[]>({
+          operation: "products.catalog",
           method: "GET",
-          path: "/products/games",
+          path: "/products/catalog",
         });
-    return toArray(raw).map(mapGameProduct);
+    return toArray(raw).map(mapCatalogProduct);
   }
 
-  private async listPinProducts(): Promise<ProviderProduct[]> {
-    try {
-      const raw = isMock()
-        ? mock.mockPinProducts
-        : await request<RawPinProduct[]>({
-            operation: "products.pins",
-            method: "GET",
-            path: "/products/pins",
-          });
-      return toArray(raw).map(mapPinProduct);
-    } catch (e) {
-      // El catálogo de PINs es secundario para Free Fire: si falla, seguimos
-      // con los paquetes de juego en lugar de dejar la tienda vacía.
-      logger.warn("No se pudo obtener /products/pins", { error: (e as Error).message });
-      return [];
-    }
-  }
-
-  // ── POST /pins/validate — precheck SIN descontar saldo ────────────────────
+  // ── POST /catalog/validate — precheck SIN descontar saldo ─────────────────
   async validateAccount(input: ValidateAccountInput): Promise<ValidateAccountResult> {
-    // La documentación restringe este endpoint a productos type=recharge de
-    // /products/pins. Para los paquetes de /products/games NO existe validación
-    // documentada: devolvemos supported=false en lugar de inventar una llamada.
     if (input.kind !== "RECHARGE") {
       return { supported: false, valid: false, accountName: null };
     }
 
     const raw = isMock()
       ? mock.mockValidate(input.accountId)
-      : await request<RawValidate>({
-          operation: "pins.validate",
+      : await request<RawCatalogValidate>({
+          operation: "catalog.validate",
           method: "POST",
-          path: "/pins/validate",
+          path: "/catalog/validate",
           body: {
             product_id: numericId(input.externalId),
             service_user_id: input.accountId,
           },
         });
+
+    // `supported:false` significa que el proveedor que hoy cumple esta compra
+    // no sabe hacer precheck. Es "sin dato", NO "ID inválido": bloquear la
+    // compra por eso sería rechazar jugadores que sí existen.
+    if (raw.supported === false) {
+      return { supported: false, valid: false, accountName: null };
+    }
 
     return {
       supported: true,
@@ -135,80 +125,72 @@ class RecargasAmericaService implements ProviderAdapter {
     };
   }
 
-  // ── Compra ────────────────────────────────────────────────────────────────
-  async purchase(input: PurchaseInput, orderId?: string): Promise<PurchaseResult> {
-    if (input.kind === "GAME_PACKAGE") return this.buyGame(input, orderId);
-    return this.buyPin(input, orderId);
-  }
-
-  /** POST /buy/games — package_id + input1..N */
-  private async buyGame(input: PurchaseInput, orderId?: string): Promise<PurchaseResult> {
-    const body: Record<string, unknown> = {
-      package_id: numericId(input.externalId),
-      client_name: input.clientReference,
-    };
-    // Solo se envían los input1..N; nada más viaja al proveedor.
-    for (const [k, v] of Object.entries(input.inputs)) {
-      if (/^input[1-9][0-9]?$/.test(k)) body[k] = v;
-    }
-
-    if (isMock()) return mapBuyGames(mock.mockBuyGames(input.externalId, input.inputs) as RawBuyGames);
-
-    const raw = await request<RawBuyGames>({
-      operation: "buy.games",
-      method: "POST",
-      path: "/buy/games",
-      body,
-      orderId,
-    });
-    return mapBuyGames(raw);
-  }
-
   /**
-   * POST /buy/pins — el body cambia según el tipo:
-   *   type=pin      → { product_id, quantity }
-   *   type=recharge → { product_id, redemption_id }
-   * NUNCA se envían `quantity` y `redemption_id` juntos (lo prohíbe la doc).
+   * POST /buy/catalog
+   *
+   * El body lleva `product_id`, la cantidad, y los campos canónicos que el
+   * producto haya declarado en `required_fields` (player_id, zone_id, …). Esos
+   * nombres se guardaron tal cual al sincronizar el catálogo, así que lo que
+   * escribió el comprador se reenvía sin traducir.
+   *
+   * Va con `Idempotency-Key` = el código de nuestra orden: si por un timeout
+   * reintentáramos la misma compra, el proveedor responde 409 en vez de cobrar
+   * y entregar dos veces.
    */
-  private async buyPin(input: PurchaseInput, orderId?: string): Promise<PurchaseResult> {
+  async purchase(input: PurchaseInput, orderId?: string): Promise<PurchaseResult> {
     const body: Record<string, unknown> = {
       product_id: numericId(input.externalId),
       client_name: input.clientReference,
     };
 
-    if (input.kind === "RECHARGE") {
-      const redemptionId = input.inputs.redemption_id ?? input.inputs.input1;
-      if (!redemptionId) throw new Error("Falta redemption_id para un producto de tipo recarga");
-      body.redemption_id = redemptionId;
-    } else {
-      const quantity = Number(input.inputs.quantity ?? "1");
-      body.quantity = Math.min(Math.max(1, Math.trunc(quantity) || 1), 10); // máx 10 según la doc
+    const quantity = Number(input.inputs.quantity ?? "1");
+    body.quantity = Math.min(Math.max(1, Math.trunc(quantity) || 1), 10); // máx 10 según la doc
+
+    for (const [key, value] of Object.entries(input.inputs)) {
+      if (key === "quantity") continue;
+      if (CANONICAL_FIELDS.has(key)) body[key] = value;
     }
 
-    if (isMock()) return mapBuyPins(mock.mockBuyPins(input.externalId) as RawBuyPins);
+    if (isMock()) {
+      return mapBuyCatalog(mock.mockBuyCatalog(input.externalId, input.inputs) as RawBuyCatalog);
+    }
 
-    const raw = await request<RawBuyPins>({
-      operation: "buy.pins",
+    const raw = await request<RawBuyCatalog>({
+      operation: "buy.catalog",
       method: "POST",
-      path: "/buy/pins",
+      path: "/buy/catalog",
       body,
       orderId,
+      idempotencyKey: input.clientReference,
     });
-    return mapBuyPins(raw);
+    return mapBuyCatalog(raw);
   }
 
-  // ── GET /orders/{reference} — conciliación de órdenes PENDING ─────────────
+  // ── GET /orders/{referencia} — conciliación de órdenes PENDING ────────────
   async getOrderStatus(reference: string, orderId?: string): Promise<OrderStatusResult> {
     if (isMock()) return mapOrder(mock.mockOrderStatus(reference));
 
-    const raw = await request<RawOrder>({
-      operation: "orders.get",
-      method: "GET",
-      path: `/orders/${encodeURIComponent(reference)}`,
-      orderId,
-      timeoutMs: 15_000,
-    });
-    return mapOrder(raw);
+    try {
+      const raw = await request<RawOrder>({
+        operation: "orders.get",
+        method: "GET",
+        path: `/orders/${encodeURIComponent(reference)}`,
+        orderId,
+        timeoutMs: 15_000,
+      });
+      return mapOrder(raw);
+    } catch (e) {
+      const err = e as ProviderRequestError;
+      // Mientras no habiliten la consulta para el catálogo unificado, esto
+      // responde 404. "No puedo preguntar" no es "la compra falló": se
+      // devuelve UNKNOWN para que la orden siga pendiente y acabe en revisión
+      // manual, nunca reembolsada a ciegas.
+      if (err instanceof ProviderRequestError && err.httpStatus === 404) {
+        logger.warn("El proveedor aún no permite consultar esta orden", { reference });
+        return { status: "UNKNOWN", reference, transactionId: null, item: null, pins: [], raw: null };
+      }
+      throw e;
+    }
   }
 
   // ── Diagnóstico para el panel admin ───────────────────────────────────────
@@ -252,6 +234,13 @@ class RecargasAmericaService implements ProviderAdapter {
     }
   }
 }
+
+/**
+ * Los únicos nombres de campo que /buy/catalog entiende. Se filtra contra esta
+ * lista para que nunca viaje al proveedor nada que el comprador haya podido
+ * inyectar en el formulario.
+ */
+const CANONICAL_FIELDS = new Set(["player_id", "zone_id", "server_id", "manual_id", "username"]);
 
 function toArray<T>(value: T[] | undefined | null): T[] {
   return Array.isArray(value) ? value : [];
