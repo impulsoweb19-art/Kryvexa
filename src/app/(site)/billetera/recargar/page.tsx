@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Alert, Card } from "@/components/ui";
 import { DepositForm } from "@/components/wallet/DepositForm";
+import { formatPEN } from "@/lib/money";
 import { requireUserPage } from "@/lib/guards";
+import { pendingDepositOf } from "@/server/services/deposits";
 import { getConfig, yapeQrSrc } from "@/server/services/settings";
 
 export const metadata: Metadata = { title: "Agregar saldo" };
 export const dynamic = "force-dynamic";
 
 export default async function TopUpPage() {
-  await requireUserPage("/billetera/recargar");
-  const config = await getConfig();
+  const user = await requireUserPage("/billetera/recargar");
+  const [config, pendiente] = await Promise.all([getConfig(), pendingDepositOf(user.id)]);
   const yapeReady = Boolean(config.yapeHolderName && config.yapePhone);
   const qrSrc = yapeQrSrc(config);
 
@@ -91,7 +93,21 @@ export default async function TopUpPage() {
         {/* Formulario */}
         <Card className="rise rise-2">
           <h2 className="mb-5 text-lg font-bold">2. Envía tu comprobante</h2>
-          <DepositForm minDepositCents={config.minDepositCents} />
+          {pendiente ? (
+            /*
+              Se avisa aquí, antes de que llene el formulario y suba la foto,
+              en lugar de dejarle hacer todo el trabajo para rechazarlo al
+              final. El servidor lo comprueba igual: esto es la cortesía.
+            */
+            <Alert tone="warn" title="Ya tienes una solicitud en revisión">
+              Tu solicitud <strong className="font-mono">{pendiente.code}</strong> por{" "}
+              <strong>{formatPEN(pendiente.amountCents)}</strong> todavía está pendiente. En cuanto
+              se apruebe o se rechace podrás enviar otra. La revisión es manual y suele tardar pocos
+              minutos en horario de atención.
+            </Alert>
+          ) : (
+            <DepositForm minDepositCents={config.minDepositCents} />
+          )}
         </Card>
       </div>
     </div>

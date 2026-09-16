@@ -39,9 +39,35 @@ export async function createDeposit(input: {
 }) {
   // Atajo barato: si este envío ya se registró, se devuelve tal cual y ni
   // siquiera se vuelve a subir el comprobante.
+  //
+  // Va ANTES de la comprobación de solicitudes pendientes a propósito: un
+  // reintento del mismo envío no puede chocar contra la solicitud que él mismo
+  // creó.
   if (input.idempotencyKey) {
     const [existing] = await findByIdempotencyKey(input.idempotencyKey);
     if (existing) return existing;
+  }
+
+  /**
+   * Una solicitud pendiente a la vez por persona.
+   *
+   * El dueño del negocio veía a diario gente enviando el mismo comprobante
+   * varias veces mientras esperaba, y acababa mandándoles advertencias de
+   * suspensión. Con esto el propio sistema lo explica en vez de que parezca
+   * mala intención, y de paso se evita que apruebe dos veces el mismo pago.
+   */
+  const [pendiente] = await db
+    .select({ code: depositRequests.code })
+    .from(depositRequests)
+    .where(and(eq(depositRequests.userId, input.userId), eq(depositRequests.status, "PENDING")))
+    .limit(1);
+
+  if (pendiente) {
+    throw new AppError("CONFLICT", {
+      userMessage:
+        `Ya tienes la solicitud ${pendiente.code} en revisión. ` +
+        "Espera a que se apruebe o se rechace antes de enviar otra.",
+    });
   }
 
   const receipt = await storeReceipt(input.file);
@@ -193,6 +219,22 @@ export async function rejectDeposit(admin: SessionUser, depositId: string, reaso
 
     return deposit;
   });
+}
+
+/**
+ * La solicitud en revisión de esta persona, si tiene alguna.
+ *
+ * La pantalla de recarga la usa para avisar ANTES de que llene el formulario y
+ * suba el comprobante, en vez de dejarle hacer todo el trabajo para rechazarlo
+ * al final.
+ */
+export async function pendingDepositOf(userId: string) {
+  const [row] = await db
+    .select({ code: depositRequests.code, amountCents: depositRequests.amountCents })
+    .from(depositRequests)
+    .where(and(eq(depositRequests.userId, userId), eq(depositRequests.status, "PENDING")))
+    .limit(1);
+  return row ?? null;
 }
 
 export async function listUserDeposits(userId: string, limit = 30) {

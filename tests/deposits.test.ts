@@ -71,16 +71,56 @@ describe("depósitos por Yape", () => {
     assert.equal(rows.length, 1, "no debe haber una segunda solicitud");
   });
 
-  it("sin clave de idempotencia sigue registrando cada solicitud", async () => {
-    const user = await createTestUser(0);
-
+  it("sin clave de idempotencia sigue registrando la solicitud", async () => {
     // Un navegador con la página abierta desde antes del despliegue no manda
     // la clave; eso no puede dejarlo sin poder recargar.
-    await createDeposit({ userId: user.id, amountCents: 5000, file: pngFile() });
+    const uno = await createTestUser(0);
+    const otro = await createTestUser(0);
+
+    const a = await createDeposit({ userId: uno.id, amountCents: 5000, file: pngFile() });
+    const b = await createDeposit({ userId: otro.id, amountCents: 5000, file: pngFile() });
+
+    assert.equal(a.status, "PENDING");
+    assert.equal(b.status, "PENDING");
+    assert.notEqual(a.id, b.id);
+  });
+
+  it("no deja enviar otro comprobante mientras hay uno en revisión", async () => {
+    const user = await createTestUser(0);
     await createDeposit({ userId: user.id, amountCents: 5000, file: pngFile() });
 
+    await assert.rejects(
+      createDeposit({ userId: user.id, amountCents: 3000, file: pngFile() }),
+      (e: unknown) => isAppError(e) && e.code === "CONFLICT",
+    );
+
     const { rows } = await listDepositsForAdmin({ search: user.email });
-    assert.equal(rows.length, 2);
+    assert.equal(rows.length, 1);
+  });
+
+  it("el reintento del mismo envío no choca contra su propia solicitud", async () => {
+    const user = await createTestUser(0);
+    const key = randomUUID();
+
+    // Si la comprobación de "una a la vez" se hiciera antes de reconocer la
+    // clave, un reintento se rechazaría contra la solicitud que él mismo creó.
+    const first = await createDeposit({
+      userId: user.id, amountCents: 5000, idempotencyKey: key, file: pngFile(),
+    });
+    const retry = await createDeposit({
+      userId: user.id, amountCents: 5000, idempotencyKey: key, file: pngFile(),
+    });
+
+    assert.equal(retry.id, first.id);
+  });
+
+  it("tras aprobar la anterior, se puede enviar una nueva", async () => {
+    const user = await createTestUser(0);
+    const primera = await createDeposit({ userId: user.id, amountCents: 5000, file: pngFile() });
+    await approveDeposit(ADMIN, primera.id);
+
+    const segunda = await createDeposit({ userId: user.id, amountCents: 3000, file: pngFile() });
+    assert.equal(segunda.status, "PENDING");
   });
 
   it("rechaza un archivo que miente sobre su tipo", async () => {
