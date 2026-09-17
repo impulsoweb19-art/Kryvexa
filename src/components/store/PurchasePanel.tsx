@@ -63,7 +63,17 @@ export function PurchasePanel({
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(product.inputFields.map((f) => [f.name, ""])),
   );
-  const [validation, setValidation] = useState<{ valid: boolean; accountName: string | null } | null>(null);
+  /**
+   * `supported:false` significa "este producto no se puede verificar", no "el
+   * ID está mal". Hay que distinguirlo: con el catálogo unificado, quién cumple
+   * la compra se decide en el momento, y no todos los proveedores saben
+   * comprobar IDs — las membresías, por ejemplo, las activan a mano.
+   */
+  const [validation, setValidation] = useState<{
+    supported: boolean;
+    valid: boolean;
+    accountName: string | null;
+  } | null>(null);
   const [validating, setValidating] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +96,20 @@ export function PurchasePanel({
     setError(null);
   }
 
+  /**
+   * Si el producto no admite verificación —o el proveedor que hoy lo cumple no
+   * sabe hacerla— se pide confirmación explícita del ID en lugar de bloquear
+   * la compra. Antes, cuando el proveedor respondía "no puedo verificar", el
+   * botón no se habilitaba nunca y el producto era imposible de comprar.
+   */
+  const verificable = product.validationSupported && validation?.supported !== false;
+
   const canBuy =
     filled &&
     affordable &&
     !submitting &&
     !order &&
-    (product.validationSupported ? validation?.valid === true : acknowledged);
+    (verificable ? validation?.valid === true : acknowledged);
 
   async function verify() {
     if (!primaryField) return;
@@ -105,8 +123,13 @@ export function PurchasePanel({
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error ?? "No pudimos verificar el ID.");
-      setValidation({ valid: json.data.valid, accountName: json.data.accountName });
-      if (!json.data.valid) setError("No encontramos una cuenta con ese ID. Revísalo e inténtalo de nuevo.");
+      const supported = json.data.supported !== false;
+      setValidation({ supported, valid: json.data.valid, accountName: json.data.accountName });
+
+      // Solo se avisa de ID inválido cuando el proveedor DE VERDAD lo comprobó.
+      if (supported && !json.data.valid) {
+        setError("No encontramos una cuenta con ese ID. Revísalo e inténtalo de nuevo.");
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -253,7 +276,7 @@ export function PurchasePanel({
       ))}
 
       {/* Verificación real, cuando el proveedor la ofrece */}
-      {product.validationSupported && (
+      {verificable && (
         <div className="space-y-3">
           <Button variant="secondary" onClick={verify} loading={validating} disabled={!filled}>
             Verificar ID
@@ -266,8 +289,15 @@ export function PurchasePanel({
         </div>
       )}
 
+      {validation?.supported === false && (
+        <Alert tone="warn" title="Este producto no permite verificar el ID">
+          El proveedor lo entrega a mano, así que no hay forma de comprobar la cuenta antes.
+          Revisa bien tu ID y confírmalo abajo.
+        </Alert>
+      )}
+
       {/* Sin verificación disponible: confirmación explícita, sin fingir nada */}
-      {!product.validationSupported && filled && (
+      {!verificable && filled && (
         <label className="flex items-start gap-2.5 rounded-xl border border-warn/30 bg-warn/5 p-4 text-sm">
           <input
             type="checkbox"
