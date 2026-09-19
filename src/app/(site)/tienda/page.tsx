@@ -61,6 +61,21 @@ export default async function StorePage() {
     return acc;
   }, {});
 
+  /*
+    Las secciones de entrega manual van al final, SIEMPRE.
+
+    Antes el orden salía de cuál producto apareciera primero en la lista, que
+    depende del orden que el administrador le dé a cada uno. Bastó agregar una
+    membresía barata para que su sección adelantara a la de los diamantes. Las
+    recargas automáticas son lo principal de la tienda: no pueden quedar debajo
+    por accidente.
+  */
+  const secciones = Object.entries(grouped).sort(([, a], [, b]) => {
+    const manual = (items: StoreProduct[]) =>
+      items.every((p) => p.providerCode === "manual") ? 1 : 0;
+    return manual(a) - manual(b);
+  });
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       {/*
@@ -105,7 +120,7 @@ export default async function StorePage() {
           />
         </div>
       ) : (
-        Object.entries(grouped).map(([game, items]) => (
+        secciones.map(([game, items]) => (
           <section key={game} className="mt-10">
             <h2 className="mb-4 flex items-center gap-3 text-sm font-semibold uppercase tracking-wider text-faint">
               {game}
