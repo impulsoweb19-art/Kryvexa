@@ -33,6 +33,12 @@ export const RULES = {
   depositCreate: { action: "deposit.create", limit: 10, windowSec: 60 * 60 },
   orderCreate: { action: "order.create", limit: 20, windowSec: 10 * 60 },
   validatePlayer: { action: "player.validate", limit: 30, windowSec: 10 * 60 },
+  /**
+   * Canje de códigos: apretado a propósito. Alguien podría intentar adivinar
+   * códigos ajenos probando combinaciones, y aunque hay 28 millones posibles,
+   * no hay razón para dejar que lo intente.
+   */
+  redeemCode: { action: "redemption.redeem", limit: 10, windowSec: 15 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 export async function consume(rule: RateLimitRule, identifier: string): Promise<void> {

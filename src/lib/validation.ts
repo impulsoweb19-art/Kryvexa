@@ -189,6 +189,22 @@ export const productOverrideSchema = z.object({
   marginBps: z.number().int().min(0).max(20_000).nullable().optional(),
 });
 
+/**
+ * Canje de un código promocional.
+ *
+ * El código se acepta tal como lo escriba la persona (con minúsculas, espacios
+ * o sin guion); normalizarlo es tarea del servicio, no del formulario.
+ */
+export const redeemCodeSchema = z.object({
+  code: cleanString(24).pipe(z.string().min(4, "Escribe tu código")),
+  playerId: cleanString(64).pipe(z.string().min(3, "Ingresa tu ID de jugador")),
+});
+
+export const generateCodesSchema = z.object({
+  prize: cleanString(160).pipe(z.string().min(3, "Describe el premio")),
+  count: z.number().int().min(1, "Al menos uno").max(200, "Máximo 200 por lote"),
+});
+
 /** Mostrar/ocultar varios productos de una sola vez (ver el botón "Seleccionar todos" del catálogo). */
 export const bulkVisibilitySchema = z.object({
   productIds: z.array(z.string().min(1)).min(1).max(2000),

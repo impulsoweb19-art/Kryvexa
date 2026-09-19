@@ -431,6 +431,43 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   providerTransactions: many(providerTransactions),
 }));
 
+/**
+ * Códigos de canje para promociones y sorteos.
+ *
+ * Cada código sirve UNA sola vez en toda la tienda: el primero que lo canjea
+ * se lo lleva y para el resto deja de existir. Esa exclusividad no se
+ * comprueba leyendo y luego escribiendo —dos personas podrían leer "libre" a
+ * la vez—, sino con una actualización condicional sobre `redeemedAt IS NULL`,
+ * el mismo candado que impide aprobar dos veces un depósito.
+ *
+ * No hay columna de estado: `redeemedAt` vacío ES el estado "disponible". Una
+ * cosa menos que pueda quedar desincronizada.
+ *
+ * El premio es texto libre que escribe el administrador ("100 diamantes",
+ * "Pase Booyah"). No se ata al catálogo a propósito: los premios de un sorteo
+ * no siempre son productos que estén a la venta.
+ */
+export const redemptionCodes = pgTable(
+  "redemption_codes",
+  {
+    id: id(),
+    /** Siempre en mayúsculas, con el formato KRYV-XXXXX. */
+    code: varchar("code", { length: 24 }).notNull(),
+    prize: varchar("prize", { length: 160 }).notNull(),
+    createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    redeemedById: text("redeemed_by_id").references(() => users.id, { onDelete: "set null" }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    /** El pedido de entrega manual que se creó al canjearlo. */
+    orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("redemption_codes_code_key").on(t.code),
+    index("redemption_codes_created_idx").on(t.createdAt),
+  ],
+);
+
 // ─── Tipos inferidos ─────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -444,4 +481,5 @@ export type OrderStatus = (typeof orderStatusEnum.enumValues)[number];
 export type ProductKind = (typeof productKindEnum.enumValues)[number];
 export type DepositStatus = (typeof depositStatusEnum.enumValues)[number];
 export type VerificationCode = typeof verificationCodes.$inferSelect;
+export type RedemptionCode = typeof redemptionCodes.$inferSelect;
 export type VerificationPurpose = (typeof verificationPurposeEnum.enumValues)[number];

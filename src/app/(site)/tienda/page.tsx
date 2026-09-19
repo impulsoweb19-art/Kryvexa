@@ -82,11 +82,19 @@ export default async function StorePage() {
             se descuentan de tu saldo.
           </p>
         </div>
-        <Link href="/billetera/recargar">
-          <Button variant="secondary">
-            Saldo: <span className="ml-1.5 font-bold tabular-nums text-ok">{formatPEN(balance.balanceCents)}</span>
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/tienda/canjear">
+            <Button variant="secondary">Canjear código</Button>
+          </Link>
+          <Link href="/billetera/recargar">
+            <Button variant="secondary">
+              Saldo:{" "}
+              <span className="ml-1.5 font-bold tabular-nums text-ok">
+                {formatPEN(balance.balanceCents)}
+              </span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {products.length === 0 ? (
