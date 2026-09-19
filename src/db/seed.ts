@@ -210,6 +210,18 @@ async function main() {
     { externalId: "manual-pase-booyah", packageName: "Pase Booyah", costSoles: 3.0 },
     { externalId: "manual-membresia-semanal", packageName: "Membresía Semanal", costSoles: 6.5 },
     { externalId: "manual-membresia-mensual", packageName: "Membresía Mensual", costSoles: 28.9 },
+    /*
+      El proveedor también la vende (Tarjeta Semanal Básica, ADS001), pero al
+      dueño le sale a S/0.90 por su cuenta frente a los S/1.70 del proveedor,
+      así que la entrega él. Pide solo el ID de jugador, como las Evo.
+    */
+    {
+      externalId: "manual-membresia-semanal-basica",
+      packageName: "Membresía Semanal Básica",
+      costSoles: 0.9,
+      priceSoles: 1.9,
+      inputs: EVO_INPUTS,
+    },
     // Precios de venta fijos según la lista de precios del negocio (cajas y
     // fragmentos, sin las demás secciones de esa lista que no son de este catálogo).
     { externalId: "manual-cajas-evo-20", packageName: "20 Cajas Evo", costSoles: 14.0, priceSoles: 17.5, inputs: EVO_INPUTS },
