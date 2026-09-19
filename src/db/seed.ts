@@ -191,13 +191,12 @@ async function main() {
   // entrega cada pedido a mano y luego lo marca "Entregado" en /admin/pedidos;
   // el precio de venta se puede ajustar en cualquier momento desde Catálogo,
   // igual que con los demás productos.
-  const MANUAL_INPUTS = [
-    { name: "input1", label: "Player ID" },
-    { name: "input2", label: "Server ID" },
-  ];
-
-  // Cajas y Fragmentos Evo se entregan solo con el ID de jugador (sin Server ID).
-  const EVO_INPUTS = [{ name: "input1", label: "Player ID" }];
+  /*
+    Solo el ID de jugador. Antes también se pedía "Server ID" y los pedidos
+    reales demostraron que sobraba: la gente no sabe qué es y acaba repitiendo
+    el mismo número en los dos campos. Para entregar a mano basta con el ID.
+  */
+  const MANUAL_INPUTS = [{ name: "input1", label: "Player ID" }];
 
   const manualProducts: Array<{
     externalId: string;
@@ -205,7 +204,6 @@ async function main() {
     costSoles: number;
     /** Si se define, fija el precio de venta exacto en vez de calcularlo por margen. */
     priceSoles?: number;
-    inputs?: typeof MANUAL_INPUTS;
   }> = [
     { externalId: "manual-pase-booyah", packageName: "Pase Booyah", costSoles: 3.0 },
     { externalId: "manual-membresia-semanal", packageName: "Membresía Semanal", costSoles: 6.5 },
@@ -213,27 +211,26 @@ async function main() {
     /*
       El proveedor también la vende (Tarjeta Semanal Básica, ADS001), pero al
       dueño le sale a S/0.90 por su cuenta frente a los S/1.70 del proveedor,
-      así que la entrega él. Pide solo el ID de jugador, como las Evo.
+      así que la entrega él: gana S/1.00 por venta en vez de S/0.20.
     */
     {
       externalId: "manual-membresia-semanal-basica",
       packageName: "Membresía Semanal Básica",
       costSoles: 0.9,
       priceSoles: 1.9,
-      inputs: EVO_INPUTS,
     },
     // Precios de venta fijos según la lista de precios del negocio (cajas y
     // fragmentos, sin las demás secciones de esa lista que no son de este catálogo).
-    { externalId: "manual-cajas-evo-20", packageName: "20 Cajas Evo", costSoles: 14.0, priceSoles: 17.5, inputs: EVO_INPUTS },
-    { externalId: "manual-cajas-evo-30", packageName: "30 Cajas Evo", costSoles: 22.0, priceSoles: 27.5, inputs: EVO_INPUTS },
-    { externalId: "manual-cajas-evo-60", packageName: "60 Cajas Evo", costSoles: 36.0, priceSoles: 45.0, inputs: EVO_INPUTS },
-    { externalId: "manual-cajas-evo-120", packageName: "120 Cajas Evo", costSoles: 56.8, priceSoles: 71.0, inputs: EVO_INPUTS },
-    { externalId: "manual-cajas-evo-240", packageName: "240 Cajas Evo", costSoles: 110.4, priceSoles: 138.0, inputs: EVO_INPUTS },
-    { externalId: "manual-fragmentos-evo-99", packageName: "99 Fragmentos Evo", costSoles: 14.0, priceSoles: 17.5, inputs: EVO_INPUTS },
-    { externalId: "manual-fragmentos-evo-150", packageName: "150 Fragmentos Evo", costSoles: 22.0, priceSoles: 27.5, inputs: EVO_INPUTS },
-    { externalId: "manual-fragmentos-evo-300", packageName: "300 Fragmentos Evo", costSoles: 36.0, priceSoles: 45.0, inputs: EVO_INPUTS },
-    { externalId: "manual-fragmentos-evo-600", packageName: "600 Fragmentos Evo", costSoles: 56.8, priceSoles: 71.0, inputs: EVO_INPUTS },
-    { externalId: "manual-fragmentos-evo-1200", packageName: "1200 Fragmentos Evo", costSoles: 110.4, priceSoles: 138.0, inputs: EVO_INPUTS },
+    { externalId: "manual-cajas-evo-20", packageName: "20 Cajas Evo", costSoles: 14.0, priceSoles: 17.5 },
+    { externalId: "manual-cajas-evo-30", packageName: "30 Cajas Evo", costSoles: 22.0, priceSoles: 27.5 },
+    { externalId: "manual-cajas-evo-60", packageName: "60 Cajas Evo", costSoles: 36.0, priceSoles: 45.0 },
+    { externalId: "manual-cajas-evo-120", packageName: "120 Cajas Evo", costSoles: 56.8, priceSoles: 71.0 },
+    { externalId: "manual-cajas-evo-240", packageName: "240 Cajas Evo", costSoles: 110.4, priceSoles: 138.0 },
+    { externalId: "manual-fragmentos-evo-99", packageName: "99 Fragmentos Evo", costSoles: 14.0, priceSoles: 17.5 },
+    { externalId: "manual-fragmentos-evo-150", packageName: "150 Fragmentos Evo", costSoles: 22.0, priceSoles: 27.5 },
+    { externalId: "manual-fragmentos-evo-300", packageName: "300 Fragmentos Evo", costSoles: 36.0, priceSoles: 45.0 },
+    { externalId: "manual-fragmentos-evo-600", packageName: "600 Fragmentos Evo", costSoles: 56.8, priceSoles: 71.0 },
+    { externalId: "manual-fragmentos-evo-1200", packageName: "1200 Fragmentos Evo", costSoles: 110.4, priceSoles: 138.0 },
   ];
 
   for (const item of manualProducts) {
@@ -254,7 +251,7 @@ async function main() {
         packageName: item.packageName,
         costUsdCents,
         priceCents,
-        inputFields: sql`${JSON.stringify(item.inputs ?? MANUAL_INPUTS)}::jsonb`,
+        inputFields: sql`${JSON.stringify(MANUAL_INPUTS)}::jsonb`,
         validationSupported: false,
         sortOrder: Math.min(9999, Math.round(costUsdCents / 100)),
         lastSyncedAt: new Date(),
