@@ -188,6 +188,8 @@ export interface CodeRow {
   code: string;
   prize: string;
   redeemedAt: Date | null;
+  /** El nombre con el que se registró: es como el dueño reconoce a su gente. */
+  redeemedByName: string | null;
   redeemedByEmail: string | null;
   orderCode: string | null;
   createdAt: Date;
@@ -200,6 +202,7 @@ export async function listCodes(limit = 200): Promise<CodeRow[]> {
       code: redemptionCodes.code,
       prize: redemptionCodes.prize,
       redeemedAt: redemptionCodes.redeemedAt,
+      redeemedByName: users.name,
       redeemedByEmail: users.email,
       orderCode: orders.code,
       createdAt: redemptionCodes.createdAt,

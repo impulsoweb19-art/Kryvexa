@@ -54,8 +54,17 @@ export default async function AdminCodesPage() {
                 {c.redeemedAt ? (
                   <>
                     <p>
-                      Canjeado por <span className="text-muted">{c.redeemedByEmail ?? "—"}</span>
+                      Canjeado por{" "}
+                      <span className="text-muted">{c.redeemedByName ?? c.redeemedByEmail ?? "—"}</span>
                     </p>
+                    {/*
+                      El correo se mantiene debajo y en pequeño: el nombre es
+                      cómo el dueño reconoce a su gente, pero dos personas
+                      pueden llamarse igual y entonces hace falta distinguirlas.
+                    */}
+                    {c.redeemedByName && c.redeemedByEmail && (
+                      <p className="text-[11px] opacity-70">{c.redeemedByEmail}</p>
+                    )}
                     <p>{dateFmt.format(c.redeemedAt)}</p>
                     {c.orderCode && <p className="font-mono text-muted">{c.orderCode}</p>}
                   </>
