@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Button, Card, EmptyState, ORDER_STATUS_META } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ORDER_STATUS_META, Pagination } from "@/components/ui";
 import { formatPEN } from "@/lib/money";
 import { requireUserPage } from "@/lib/guards";
 import { listUserOrders } from "@/server/services/orders";
 
 export const metadata: Metadata = { title: "Mis pedidos" };
 export const dynamic = "force-dynamic";
+
+const PER_PAGE = 50;
 
 const dateFmt = new Intl.DateTimeFormat("es-PE", {
   day: "2-digit",
@@ -17,9 +19,24 @@ const dateFmt = new Intl.DateTimeFormat("es-PE", {
   timeZone: "America/Lima",
 });
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const user = await requireUserPage("/pedidos");
-  const orders = await listUserOrders(user.id, 50);
+  const { page: rawPage } = await searchParams;
+  const page = Math.max(1, Number(rawPage) || 1);
+
+  /*
+    Se pide uno más de los que se muestran: si viene, es que hay página
+    siguiente. Evita una segunda consulta solo para contar, que en un
+    historial personal no aporta nada — al comprador le da igual si tiene
+    137 pedidos, lo que quiere es poder llegar a los de antes.
+  */
+  const rows = await listUserOrders(user.id, PER_PAGE + 1, (page - 1) * PER_PAGE);
+  const hasMore = rows.length > PER_PAGE;
+  const orders = hasMore ? rows.slice(0, PER_PAGE) : rows;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
@@ -85,6 +102,10 @@ export default async function OrdersPage() {
           </ul>
         </Card>
       )}
+
+      <div className="mt-6">
+        <Pagination page={page} hasMore={hasMore} basePath="/pedidos" />
+      </div>
     </div>
   );
 }

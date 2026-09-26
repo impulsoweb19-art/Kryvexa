@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 /**
@@ -262,5 +263,78 @@ export function Stat({
       </p>
       {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </div>
+  );
+}
+
+/**
+ * Navegación entre páginas de un listado.
+ *
+ * Existe porque los listados traían un tope fijo y nada más: el panel decía
+ * "312 resultado(s)" y mostraba 50, sin ninguna forma de llegar al resto. Un
+ * listado que anuncia cuántos hay y no deja alcanzarlos se lee como roto.
+ *
+ * Conserva el resto de la consulta (filtros, búsqueda) al cambiar de página:
+ * perder el filtro al pasar a la página 2 sería peor que no paginar.
+ */
+export function Pagination({
+  page,
+  hasMore,
+  basePath,
+  params = {},
+  total,
+  perPage,
+}: {
+  /** Empieza en 1. */
+  page: number;
+  hasMore: boolean;
+  basePath: string;
+  /** Filtros a conservar (status, q, …). Los vacíos se descartan. */
+  params?: Record<string, string | undefined>;
+  total?: number;
+  perPage?: number;
+}) {
+  if (page === 1 && !hasMore) return null;
+
+  const hrefFor = (destino: number) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value) query.set(key, value);
+    }
+    if (destino > 1) query.set("page", String(destino));
+    const qs = query.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
+
+  const desde = total !== undefined && perPage ? (page - 1) * perPage + 1 : null;
+  const hasta = total !== undefined && perPage ? Math.min(page * perPage, total) : null;
+
+  return (
+    <nav className="flex flex-wrap items-center justify-between gap-3 pt-2">
+      <p className="text-xs text-faint">
+        {desde !== null && hasta !== null && total !== undefined
+          ? `Mostrando ${desde}–${hasta} de ${total}`
+          : `Página ${page}`}
+      </p>
+
+      <div className="flex gap-2">
+        {page > 1 ? (
+          <Link
+            href={hrefFor(page - 1)}
+            className="rounded-lg border border-line bg-abyss px-3.5 py-2 text-sm text-muted transition-colors hover:text-ink"
+          >
+            ← Anteriores
+          </Link>
+        ) : null}
+
+        {hasMore ? (
+          <Link
+            href={hrefFor(page + 1)}
+            className="rounded-lg border border-line bg-abyss px-3.5 py-2 text-sm text-muted transition-colors hover:text-ink"
+          >
+            Siguientes →
+          </Link>
+        ) : null}
+      </div>
+    </nav>
   );
 }

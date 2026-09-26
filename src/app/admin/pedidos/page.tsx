@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, ORDER_STATUS_META, cx } from "@/components/ui";
+import { Badge, Card, EmptyState, ORDER_STATUS_META, Pagination, cx } from "@/components/ui";
 import { OrderActions } from "@/components/admin/OrderActions";
 import { formatPEN, formatUSD } from "@/lib/money";
 import { listOrdersForAdmin } from "@/server/services/orders";
 import type { OrderStatus } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
+
+/** Cuántos pedidos por página. Los demás se alcanzan con los botones de abajo. */
+const PER_PAGE = 50;
 
 const FILTERS: Array<{ value: OrderStatus | "ALL"; label: string }> = [
   { value: "ALL", label: "Todos" },
@@ -27,15 +30,17 @@ const dateFmt = new Intl.DateTimeFormat("es-PE", {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const sp = await searchParams;
   const status = (sp.status ?? "ALL") as OrderStatus | "ALL";
+  const page = Math.max(1, Number(sp.page) || 1);
 
   const { rows, total } = await listOrdersForAdmin({
     status: status === "ALL" ? undefined : status,
     search: sp.q,
-    limit: 50,
+    limit: PER_PAGE,
+    offset: (page - 1) * PER_PAGE,
   });
 
   return (
@@ -143,6 +148,15 @@ export default async function AdminOrdersPage({
               </Card>
             );
           })}
+
+          <Pagination
+            page={page}
+            hasMore={page * PER_PAGE < total}
+            basePath="/admin/pedidos"
+            params={{ status: status === "ALL" ? undefined : status, q: sp.q }}
+            total={total}
+            perPage={PER_PAGE}
+          />
         </div>
       )}
     </div>
