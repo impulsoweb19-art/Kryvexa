@@ -75,7 +75,7 @@ export function GameCard({ href, name, tagline, image, badge }: GameCardProps) {
             src={image}
             alt={name}
             fill
-            sizes="(max-width: 640px) 90vw, 380px"
+            sizes="(max-width: 640px) 45vw, 380px"
             priority
             className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           />
@@ -96,13 +96,18 @@ export function GameCard({ href, name, tagline, image, badge }: GameCardProps) {
           ensuciaba las dos cosas. Así también se lee bien si algún día se
           cambia la imagen por otra.
         */}
-        <span className="flex items-center justify-between gap-3 border-t border-line-soft bg-abyss px-4 py-3.5">
-          <span className="block">
-            <span className="block text-lg font-black leading-tight tracking-tight">{name}</span>
-            <span className="mt-0.5 block text-xs text-muted">{tagline}</span>
+        {/* Tipografía y flecha más pequeñas en el móvil: ahí la tarjeta mide
+            media pantalla y con los tamaños de escritorio el texto se
+            amontonaba contra la flecha. */}
+        <span className="flex items-center justify-between gap-2 border-t border-line-soft bg-abyss px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5">
+          <span className="block min-w-0">
+            <span className="block truncate text-base font-black leading-tight tracking-tight sm:text-lg">
+              {name}
+            </span>
+            <span className="mt-0.5 block truncate text-[11px] text-muted sm:text-xs">{tagline}</span>
           </span>
           <span
-            className="grid size-9 shrink-0 place-items-center rounded-full border border-flame-500/50 bg-flame-500/15 text-flame-400 transition-all duration-300 group-hover:border-flame-500 group-hover:bg-flame-500 group-hover:text-void"
+            className="grid size-8 shrink-0 place-items-center rounded-full border border-flame-500/50 bg-flame-500/15 text-flame-400 transition-all duration-300 group-hover:border-flame-500 group-hover:bg-flame-500 group-hover:text-void sm:size-9"
             aria-hidden
           >
             →

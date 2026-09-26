@@ -207,7 +207,13 @@ export default async function HomePage() {
           </div>
         )}
 
-        <div className="mt-10 flex flex-wrap justify-center gap-6">
+        {/*
+          Dos por fila en el móvil, que es donde compra casi todo el mundo: a
+          ancho completo cada casilla ocupaba una pantalla entera y con tres
+          juegos había que hacer scroll para ver el catálogo. En pantallas
+          grandes sigue como estaba, centradas y sin estirarse.
+        */}
+        <div className="mt-10 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-center sm:gap-6">
           {GAMES.map((game) => (
             <GameCard
               key={game.name}
