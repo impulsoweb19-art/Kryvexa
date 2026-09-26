@@ -198,12 +198,19 @@ async function main() {
   */
   const MANUAL_INPUTS = [{ name: "input1", label: "Player ID" }];
 
+  /** Debe contener "Blood Strike" para que lo reconozcan la tienda y el panel. */
+  const BLOOD_STRIKE = "Blood Strike — Entrega manual";
+
   const manualProducts: Array<{
     externalId: string;
     packageName: string;
     costSoles: number;
     /** Si se define, fija el precio de venta exacto en vez de calcularlo por margen. */
     priceSoles?: number;
+    /** Por defecto Free Fire; los demás juegos lo declaran. */
+    gameName?: string;
+    /** Si se define, manda sobre el orden calculado a partir del costo. */
+    sortOrder?: number;
   }> = [
     { externalId: "manual-pase-booyah", packageName: "Pase Booyah", costSoles: 3.0 },
     { externalId: "manual-membresia-semanal", packageName: "Membresía Semanal", costSoles: 6.5 },
@@ -231,6 +238,79 @@ async function main() {
     { externalId: "manual-fragmentos-evo-300", packageName: "300 Fragmentos Evo", costSoles: 36.0, priceSoles: 45.0 },
     { externalId: "manual-fragmentos-evo-600", packageName: "600 Fragmentos Evo", costSoles: 56.8, priceSoles: 71.0 },
     { externalId: "manual-fragmentos-evo-1200", packageName: "1200 Fragmentos Evo", costSoles: 110.4, priceSoles: 138.0 },
+
+    /*
+      BLOOD STRIKE — todo de entrega manual, sin proveedor conectado.
+
+      Precios de venta y costos salen de la lista que pasó el dueño. El orden
+      va explícito (y no derivado del costo, como en el resto) porque los dos
+      Pases cuestan más que varios paquetes de Oro y, ordenando por costo, se
+      colaban en medio de la escalera de Oro. Aquí manda el orden de la lista.
+    */
+    {
+      externalId: "manual-bs-oro-105",
+      packageName: "105 Oro",
+      costSoles: 0.65,
+      priceSoles: 3.0,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 1,
+    },
+    {
+      externalId: "manual-bs-oro-320",
+      packageName: "320 Oro",
+      costSoles: 1.49,
+      priceSoles: 8.5,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 2,
+    },
+    {
+      externalId: "manual-bs-oro-540",
+      packageName: "540 Oro",
+      costSoles: 2.49,
+      priceSoles: 14.5,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 3,
+    },
+    {
+      externalId: "manual-bs-oro-1100",
+      packageName: "1100 Oro",
+      costSoles: 4.99,
+      priceSoles: 29.0,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 4,
+    },
+    {
+      externalId: "manual-bs-oro-2260",
+      packageName: "2260 Oro",
+      costSoles: 6.99,
+      priceSoles: 55.0,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 5,
+    },
+    {
+      externalId: "manual-bs-oro-5800",
+      packageName: "5800 Oro",
+      costSoles: 14.29,
+      priceSoles: 135.0,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 6,
+    },
+    {
+      externalId: "manual-bs-pase-elite",
+      packageName: "Pase Élite",
+      costSoles: 9.5,
+      priceSoles: 13.0,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 7,
+    },
+    {
+      externalId: "manual-bs-pase-premium",
+      packageName: "Pase Premium",
+      costSoles: 23.85,
+      priceSoles: 29.9,
+      gameName: BLOOD_STRIKE,
+      sortOrder: 8,
+    },
   ];
 
   for (const item of manualProducts) {
@@ -247,13 +327,13 @@ async function main() {
         providerCode: "manual",
         externalId: item.externalId,
         kind: "GAME_PACKAGE",
-        gameName: "Free Fire — Entrega manual",
+        gameName: item.gameName ?? "Free Fire — Entrega manual",
         packageName: item.packageName,
         costUsdCents,
         priceCents,
         inputFields: sql`${JSON.stringify(MANUAL_INPUTS)}::jsonb`,
         validationSupported: false,
-        sortOrder: Math.min(9999, Math.round(costUsdCents / 100)),
+        sortOrder: item.sortOrder ?? Math.min(9999, Math.round(costUsdCents / 100)),
         lastSyncedAt: new Date(),
       })
       .onConflictDoNothing();

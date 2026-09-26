@@ -35,6 +35,13 @@ const GAMES = [
     badge: "Disponible",
     href: "/tienda/mobile-legends",
   },
+  {
+    name: "Blood Strike",
+    tagline: "Oro y pases",
+    image: "/juegos/blood-strike.webp",
+    badge: "Disponible",
+    href: "/tienda/blood-strike",
+  },
 ];
 
 export default async function HomePage() {

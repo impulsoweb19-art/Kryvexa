@@ -35,6 +35,9 @@ const GAME_TABS = [
       p.providerCode === "recargas_america" || (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName)) },
   { key: "mobile-legends", label: "Mobile Legends", match: (p: AdminProductRow) =>
       p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile?\s*legends/i.test(p.gameName)) },
+  // Blood Strike es solo de entrega manual: no hay proveedor que sincronizar.
+  { key: "blood-strike", label: "Blood Strike", match: (p: AdminProductRow) =>
+      p.providerCode === "manual" && /blood\s*strike/i.test(p.gameName) },
 ] as const;
 
 export function CatalogManager({

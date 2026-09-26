@@ -138,6 +138,14 @@ export const isFreeFireProduct = (p: Product) =>
 export const isMobileLegendsProduct = (p: Product) =>
   p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile?\s*legends/i.test(p.gameName));
 
+/**
+ * Blood Strike es hoy 100% de entrega manual: el dueño lo activa a mano en
+ * cada compra. Si algún día se integra un proveedor para este juego, aquí se
+ * añade su `providerCode` igual que en los dos de arriba.
+ */
+export const isBloodStrikeProduct = (p: Product) =>
+  p.providerCode === "manual" && /blood\s*strike/i.test(p.gameName);
+
 export async function listAllProducts(): Promise<Product[]> {
   return db.select().from(products).orderBy(asc(products.sortOrder), asc(products.costUsdCents));
 }
