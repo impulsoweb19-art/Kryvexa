@@ -55,6 +55,12 @@ export interface ValidateAccountResult {
   supported: boolean;
   valid: boolean;
   accountName: string | null;
+  /**
+   * Por qué el proveedor rechazó la cuenta, ya redactado para el comprador.
+   * Solo se rellena cuando `valid` es false por una negativa EXPLÍCITA del
+   * proveedor. Si no pudimos preguntar, va null y `supported` es false.
+   */
+  reason?: string | null;
 }
 
 export interface PurchaseInput {

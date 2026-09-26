@@ -51,6 +51,12 @@ interface OrderView {
 const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_TRIES = 24; // 2 minutos
 
+/** Nombres que usan los proveedores para la zona/servidor del jugador. */
+const ZONE_FIELDS = new Set(["input2", "zone_id", "server_id"]);
+
+/** "1459444607 (1626)" → ["1459444607", "1626"]. */
+const PEGADO_CON_ZONA = /^(\d{4,})\s*[([]\s*(\d{1,6})\s*[)\]]$/;
+
 export function PurchasePanel({
   product,
   balanceCents,
@@ -73,6 +79,7 @@ export function PurchasePanel({
     supported: boolean;
     valid: boolean;
     accountName: string | null;
+    reason: string | null;
   } | null>(null);
   const [validating, setValidating] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -88,13 +95,46 @@ export function PurchasePanel({
   const filled = product.inputFields.every((f) => values[f.name]?.trim());
   const primaryField = product.inputFields[0]?.name;
 
+  /**
+   * El segundo campo de las recargas (zona / servidor), se llame como se llame
+   * según el proveedor. En Mobile Legends el juego muestra el ID como
+   * "1459444607 (1626)": el número de fuera es el ID y el de los paréntesis es
+   * este campo. Mucha gente no lo sabe y repite el mismo número en los dos, lo
+   * que el proveedor acepta, cobra y luego cancela.
+   */
+  const zoneField = product.inputFields.find((f) => ZONE_FIELDS.has(f.name))?.name;
+
   // Si el usuario cambia los datos, cualquier verificación previa deja de valer.
   function setField(name: string, value: string) {
-    setValues((prev) => ({ ...prev, [name]: value }));
+    setValues((prev) => {
+      const next = { ...prev, [name]: value };
+      // Pegar el ID completo tal y como lo muestra el juego rellena los dos
+      // campos, en vez de obligar a separarlo a mano (y equivocarse).
+      if (name === primaryField && zoneField) {
+        const m = PEGADO_CON_ZONA.exec(value.trim());
+        if (m) {
+          next[primaryField] = m[1];
+          next[zoneField] = m[2];
+        }
+      }
+      return next;
+    });
     setValidation(null);
     setAcknowledged(false);
     setError(null);
   }
+
+  /**
+   * El error que provocó los cuatro pedidos cancelados del 26/09/2026: el
+   * comprador puso su ID de jugador también en el campo de servidor. No hay
+   * ningún caso en que los dos sean iguales, así que se bloquea antes de
+   * gastar un pedido.
+   */
+  const zonaRepetida =
+    !!zoneField &&
+    !!primaryField &&
+    !!values[zoneField]?.trim() &&
+    values[zoneField].trim() === values[primaryField]?.trim();
 
   /**
    * Si el producto no admite verificación —o el proveedor que hoy lo cumple no
@@ -109,6 +149,7 @@ export function PurchasePanel({
     affordable &&
     !submitting &&
     !order &&
+    !zonaRepetida &&
     (verificable ? validation?.valid === true : acknowledged);
 
   async function verify() {
@@ -124,11 +165,21 @@ export function PurchasePanel({
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error ?? "No pudimos verificar el ID.");
       const supported = json.data.supported !== false;
-      setValidation({ supported, valid: json.data.valid, accountName: json.data.accountName });
+      setValidation({
+        supported,
+        valid: json.data.valid,
+        accountName: json.data.accountName,
+        reason: json.data.reason ?? null,
+      });
 
       // Solo se avisa de ID inválido cuando el proveedor DE VERDAD lo comprobó.
+      // Si dio un motivo concreto se muestra ese, no una frase genérica: con
+      // la frase genérica el comprador cree que es un fallo pasajero y vuelve
+      // a intentarlo, que es justo lo que queremos evitar.
       if (supported && !json.data.valid) {
-        setError("No encontramos una cuenta con ese ID. Revísalo e inténtalo de nuevo.");
+        setError(
+          json.data.reason ?? "No encontramos una cuenta con ese ID. Revísalo e inténtalo de nuevo.",
+        );
       }
     } catch (e) {
       setError((e as Error).message);
@@ -262,7 +313,17 @@ export function PurchasePanel({
       )}
 
       {product.inputFields.map((field) => (
-        <Field key={field.name} label={field.label} htmlFor={field.name}>
+        <Field
+          key={field.name}
+          label={field.label}
+          htmlFor={field.name}
+          hint={
+            field.name === zoneField
+              ? "Es el número entre paréntesis que aparece junto a tu ID dentro del juego. Si ves 1459444607 (1626), tu Server ID es 1626."
+              : undefined
+          }
+          error={field.name === zoneField && zonaRepetida ? "No puede ser igual a tu ID de jugador." : undefined}
+        >
           <Input
             id={field.name}
             name={field.name}
@@ -274,6 +335,15 @@ export function PurchasePanel({
           />
         </Field>
       ))}
+
+      {zonaRepetida && (
+        <Alert tone="warn" title="Revisa el Server ID">
+          Pusiste el mismo número en <strong>ID de jugador</strong> y en{" "}
+          <strong>Server ID</strong>. Dentro del juego tu ID se ve como{" "}
+          <strong>1459444607 (1626)</strong>: el primero es el ID y el de los paréntesis es el
+          Server ID. Enviarlo repetido hace que el proveedor cancele la recarga.
+        </Alert>
+      )}
 
       {/* Verificación real, cuando el proveedor la ofrece */}
       {verificable && (

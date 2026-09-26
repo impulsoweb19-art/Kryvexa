@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { getProductById } from "@/server/services/catalog";
 import { getProvider } from "@/server/providers/registry";
 import { AppError } from "@/lib/errors";
+import { ProviderRequestError } from "@/server/providers/types";
 
 export const runtime = "nodejs";
 
@@ -27,11 +28,49 @@ export const POST = route("catalog.validate", async (req) => {
   if (!product || !product.active) throw new AppError("PRODUCT_UNAVAILABLE");
 
   const provider = getProvider(product.providerCode);
-  const result = await provider.validateAccount({
-    externalId: product.externalId,
-    kind: product.kind,
-    accountId: input.accountId,
-  });
 
-  return ok(result);
+  try {
+    return ok(
+      await provider.validateAccount({
+        externalId: product.externalId,
+        kind: product.kind,
+        accountId: input.accountId,
+      }),
+    );
+  } catch (e) {
+    if (!(e instanceof ProviderRequestError)) throw e;
+
+    // "No pude preguntar" NO es "el ID está mal". Se degrada a
+    // `supported:false` para que el comprador pueda confirmarlo a mano, igual
+    // que con los productos que no admiten verificación.
+    if (e.resultUnknown || (e.httpStatus ?? 0) >= 500) {
+      return ok({ supported: false, valid: false, accountName: null, reason: null });
+    }
+
+    // Negativa explícita del proveedor. Antes esto acababa en un "error
+    // interno" genérico y el comprador, sin saber qué había fallado, volvía a
+    // intentarlo: el 26/09/2026 se gastaron cuatro pedidos seguidos así, todos
+    // cancelados por REGION_MISMATCH. Ahora se le dice qué pasa.
+    return ok({ supported: true, valid: false, accountName: null, reason: explicarRechazo(e) });
+  }
 });
+
+/** Traduce el código del proveedor a algo que el comprador pueda accionar. */
+function explicarRechazo(err: ProviderRequestError): string {
+  const detalles = (err.raw as { error?: { details?: Record<string, unknown> } } | null)?.error
+    ?.details;
+  const region = typeof detalles?.actual_region === "string" ? detalles.actual_region : null;
+
+  switch (err.providerCode) {
+    case "REGION_MISMATCH":
+      return region
+        ? `Esa cuenta es de la región ${region} y este paquete solo recarga cuentas de América. Revisa tu ID y tu Server ID.`
+        : "Esa cuenta pertenece a otra región y este paquete no puede recargarla. Revisa tu ID y tu Server ID.";
+    case "PLAYER_NOT_FOUND":
+    case "INVALID_PLAYER":
+    case "INVALID_PLAYER_ID":
+      return "No existe ninguna cuenta con esos datos. Revisa tu ID y tu Server ID.";
+    default:
+      return "El proveedor rechazó esos datos. Revisa tu ID y tu Server ID antes de comprar.";
+  }
+}
