@@ -50,6 +50,12 @@ export default async function TermsPage() {
             cuenta. Si sospechas un acceso no autorizado, cambia tu contraseña de inmediato y
             contáctanos.
           </p>
+          <p>
+            Publicamos un ranking mensual con las diez personas que más recargaron en el mes. En él
+            aparece el nombre con el que te registraste y el monto recargado en ese periodo; no se
+            muestra tu correo, tu teléfono ni el detalle de tus pedidos. Puedes salir de ese ranking
+            cuando quieras desde tu cuenta, sin perder ninguna otra función de la tienda.
+          </p>
         </section>
 
         <section>

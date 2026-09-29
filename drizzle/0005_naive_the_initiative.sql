@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "hide_from_ranking" boolean DEFAULT false NOT NULL;

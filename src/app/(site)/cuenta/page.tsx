@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountForm } from "@/components/auth/AccountForm";
+import { RankingCard } from "@/components/account/RankingCard";
 import { requireUserPage } from "@/lib/guards";
+import { hideFromRankingOf, puestoDe } from "@/server/services/ranking";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const user = await requireUserPage("/cuenta");
+  const [puesto, oculto] = await Promise.all([puestoDe(user.id), hideFromRankingOf(user.id)]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
@@ -20,7 +23,8 @@ export default async function AccountPage() {
         Cambia tu nombre, tu correo de acceso o tu contraseña.
       </p>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
+        <RankingCard puesto={puesto} oculto={oculto} />
         <AccountForm initial={{ name: user.name, email: user.email, role: user.role }} />
       </div>
     </div>

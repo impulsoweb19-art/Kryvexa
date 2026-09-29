@@ -75,6 +75,13 @@ export const users = pgTable(
     phone: varchar("phone", { length: 30 }),
     role: roleEnum("role").notNull().default("USER"),
     status: userStatusEnum("status").notNull().default("ACTIVE"),
+    /**
+     * Quien lo activa no sale en el ranking público de recargas. No reserva su
+     * puesto: desaparece de la tabla y los de abajo suben. La ley 29733 exige
+     * poder salirse de una publicación de datos personales, y el nombre del
+     * ranking es el de registro.
+     */
+    hideFromRanking: boolean("hide_from_ranking").notNull().default(false),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

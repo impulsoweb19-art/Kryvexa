@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Alert, Button, Field, Input } from "@/components/ui";
+import { EmailField } from "@/components/auth/EmailField";
 import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "@/lib/validation";
 
 /**
@@ -168,9 +169,10 @@ export function RegisterForm() {
         <Input id="name" name="name" autoComplete="name" placeholder="Tu nombre" required />
       </Field>
 
-      <Field label="Correo electrónico" htmlFor="email" error={errors.email}>
-        <Input id="email" name="email" type="email" autoComplete="email" placeholder="tu@correo.com" required />
-      </Field>
+      <EmailField
+        error={errors.email}
+        hint="Aquí te llega el código si alguna vez olvidas tu contraseña. Revísalo bien."
+      />
 
       <Field label="WhatsApp (opcional)" htmlFor="phone" hint="Solo para avisarte de tus depósitos." error={errors.phone}>
         <Input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="+51 999 999 999" />
@@ -332,17 +334,7 @@ export function ForgotPasswordForm() {
           contraseña nueva.
         </p>
 
-        <Field label="Correo electrónico" htmlFor="email" error={errors.email}>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="tu@correo.com"
-            aria-invalid={Boolean(errors.email)}
-            required
-          />
-        </Field>
+        <EmailField error={errors.email} />
 
         <Button type="submit" fullWidth size="lg" loading={loading}>
           Enviar código

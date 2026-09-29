@@ -233,7 +233,16 @@ export default async function HomePage() {
           ))}
         </div>
 
-        <p className="mt-8 text-center text-sm text-faint">
+        <div className="mt-8 text-center">
+          <Link
+            href="/top"
+            className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted transition-colors hover:border-flame-500/40 hover:text-ink"
+          >
+            🏆 Mira el <span className="font-bold text-ink">top recargueros</span> del mes
+          </Link>
+        </div>
+
+        <p className="mt-6 text-center text-sm text-faint">
           {cheapest !== null ? (
             <>
               Desde <span className="font-bold text-flame-400">{formatPEN(cheapest)}</span> ·{" "}

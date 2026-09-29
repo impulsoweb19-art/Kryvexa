@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import { EmailField } from "@/components/auth/EmailField";
 import { accountSchema } from "@/lib/validation";
 
 /**
@@ -88,15 +89,7 @@ export function AccountForm({
           <Input id="name" name="name" defaultValue={initial.name} autoComplete="name" />
         </Field>
 
-        <Field label="Correo electrónico" htmlFor="email" error={errors.email}>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            defaultValue={initial.email}
-            autoComplete="email"
-          />
-        </Field>
+        <EmailField error={errors.email} defaultValue={initial.email} required={false} />
       </Card>
 
       <Card className="space-y-4">

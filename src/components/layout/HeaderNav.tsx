@@ -20,7 +20,10 @@ export interface NavUser {
  * llevaría siempre a Free Fire, que dejaría de tener sentido en cuanto haya
  * un segundo juego. Para volver a elegir está el logo (lleva a la portada).
  */
-const LINKS = [
+/** El ranking es público: se ve sin cuenta, así que va fuera de la sesión. */
+const LINKS_PUBLICOS = [{ href: "/top", label: "Top del mes" }];
+
+const LINKS_CON_SESION = [
   { href: "/billetera", label: "Billetera" },
   { href: "/pedidos", label: "Mis pedidos" },
   { href: "/cuenta", label: "Mi cuenta" },
@@ -37,7 +40,7 @@ export function HeaderNav({ user }: { user: NavUser | null }) {
     router.refresh();
   }
 
-  const links = user ? LINKS : [];
+  const links = user ? [...LINKS_PUBLICOS, ...LINKS_CON_SESION] : LINKS_PUBLICOS;
 
   return (
     <>
@@ -149,6 +152,16 @@ export function HeaderNav({ user }: { user: NavUser | null }) {
             </div>
           ) : (
             <div className="space-y-2">
+              {LINKS_PUBLICOS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="block rounded-xl px-4 py-3 text-sm hover:bg-surface-2"
+                >
+                  {link.label}
+                </Link>
+              ))}
               <Link href="/login" onClick={() => setOpen(false)}>
                 <Button variant="secondary" fullWidth>
                   Iniciar sesión
