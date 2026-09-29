@@ -118,26 +118,22 @@ export default async function TopPage() {
 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold leading-tight">{fila.name}</span>
-                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-                    {medalla && (
-                      <span className={`font-bold uppercase tracking-wide ${medalla.texto}`}>
-                        {medalla.nombre}
-                      </span>
-                    )}
-                    {medalla && <span className="text-faint">·</span>}
-                    <span>
-                      {fila.orders} {fila.orders === 1 ? "recarga" : "recargas"}
+                  {medalla && (
+                    <span
+                      className={`mt-0.5 block text-xs font-bold uppercase tracking-wide ${medalla.texto}`}
+                    >
+                      {medalla.nombre}
                     </span>
-                  </span>
+                  )}
                 </span>
 
-                <span className="shrink-0 text-right">
-                  <span className="block font-bold tabular-nums text-crown-400">
-                    {enteros.format(fila.diamonds)}
-                  </span>
-                  <span className="block text-[10px] uppercase tracking-wide text-faint">
-                    diamantes
-                  </span>
+                {/* El icono sustituye a la palabra "diamantes", que ocupaba una
+                    línea entera para repetir diez veces lo mismo. Para quien
+                    usa lector de pantalla el texto sigue ahí. */}
+                <span className="flex shrink-0 items-center gap-1.5 font-bold tabular-nums text-crown-400">
+                  <span aria-hidden>💎</span>
+                  {enteros.format(fila.diamonds)}
+                  <span className="sr-only">diamantes</span>
                 </span>
               </li>
             );
