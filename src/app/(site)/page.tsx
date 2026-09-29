@@ -215,6 +215,31 @@ export default async function HomePage() {
         )}
 
         {/*
+          El ranking va ENCIMA de las casillas, no debajo: ahí abajo quedaba
+          después del scroll y casi nadie llegaba. El borde animado en rojo y
+          naranja es lo único de esta pantalla que se mueve, así que compite
+          con las casillas sin necesitar más tamaño.
+        */}
+        <div className="mt-8 flex justify-center sm:mt-10">
+          <Link href="/top" className="line-border-flame group block w-full max-w-md">
+            <span className="flex items-center justify-center gap-2.5 rounded-[18px] bg-abyss px-4 py-3 text-sm sm:px-5 sm:py-3.5">
+              <span aria-hidden className="text-base sm:text-lg">
+                🏆
+              </span>
+              <span className="font-black tracking-tight text-ink">
+                Top recargueros <span className="text-gradient-flame">del mes</span>
+              </span>
+              <span
+                aria-hidden
+                className="text-flame-400 transition-transform duration-300 group-hover:translate-x-1"
+              >
+                →
+              </span>
+            </span>
+          </Link>
+        </div>
+
+        {/*
           Dos por fila en el móvil, que es donde compra casi todo el mundo: a
           ancho completo cada casilla ocupaba una pantalla entera y con tres
           juegos había que hacer scroll para ver el catálogo. En pantallas
@@ -231,15 +256,6 @@ export default async function HomePage() {
               badge={game.badge}
             />
           ))}
-        </div>
-
-        <div className="mt-8 text-center">
-          <Link
-            href="/top"
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-muted transition-colors hover:border-flame-500/40 hover:text-ink"
-          >
-            🏆 Mira el <span className="font-bold text-ink">top recargueros</span> del mes
-          </Link>
         </div>
 
         <p className="mt-6 text-center text-sm text-faint">

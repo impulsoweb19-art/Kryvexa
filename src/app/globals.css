@@ -197,6 +197,42 @@ body::before {
   to { transform: translate(-50%, -50%) rotate(1turn); }
 }
 
+/*
+  Igual que `line-border` pero sin el tramo morado: el dueño pidió el banner
+  del ranking con un borde rojo/naranja, y el plasma lo apagaba justo encima
+  de las casillas de juego, que ya son muy coloridas.
+*/
+@utility line-border-flame {
+  position: relative;
+  isolation: isolate;
+  border-radius: 20px;
+  background: var(--color-line);
+  padding: 2px;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 175%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+    background: conic-gradient(
+      from 0turn,
+      transparent 0turn 0.04turn,
+      var(--color-flame-500) 0.1turn,
+      var(--color-flame-400) 0.14turn,
+      transparent 0.22turn 0.54turn,
+      var(--color-flame-400) 0.6turn,
+      var(--color-flame-500) 0.64turn,
+      transparent 0.72turn 1turn
+    );
+    animation: border-spin 3.5s linear infinite;
+  }
+}
+
 @utility line-border {
   position: relative;
   isolation: isolate;
@@ -259,7 +295,8 @@ body::before {
   .rise { opacity: 1 !important; transform: none !important; }
 
   /* El borde deja de girar: se queda como un contorno fijo, no parpadeando. */
-  .line-border::before { animation: none !important; }
+  .line-border::before,
+  .line-border-flame::before { animation: none !important; }
 
   /* La cascada del fondo se retira entera: quieta no aporta nada y unos logos
      congelados a media pantalla se leerían como un fallo de carga. */
