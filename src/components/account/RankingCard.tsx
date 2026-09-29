@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, Card } from "@/components/ui";
-import { formatPEN } from "@/lib/money";
+
 import type { PuestoPropio } from "@/server/services/ranking";
+
+/** Miles con punto, como se leen los diamantes dentro del juego. */
+const enteros = new Intl.NumberFormat("es-PE");
 
 /**
  * El puesto propio dentro del ranking, en la cuenta de cada persona.
@@ -55,10 +58,10 @@ export function RankingCard({
         <h2 className="font-bold">Ranking del mes</h2>
         <p className="mt-1 text-sm text-muted">
           Los diez primeros salen en el{" "}
-          <Link href="/top" className="text-flame-400 hover:underline">
+          <Link href="/top" className="text-crown-400 hover:underline">
             top público
           </Link>
-          . Tu puesto solo lo ves tú.
+          . Cuentan los diamantes de Free Fire. Tu puesto solo lo ves tú.
         </p>
       </div>
 
@@ -72,10 +75,12 @@ export function RankingCard({
         <div className="flex items-center justify-between rounded-xl border border-line bg-abyss px-4 py-3">
           <div>
             <p className="text-xs text-faint">Tu puesto este mes</p>
-            <p className="text-2xl font-black tabular-nums text-flame-400">#{puesto.position}</p>
+            <p className="text-2xl font-black tabular-nums text-crown-400">#{puesto.position}</p>
           </div>
           <div className="text-right">
-            <p className="font-semibold tabular-nums">{formatPEN(puesto.totalCents)}</p>
+            <p className="font-semibold tabular-nums text-crown-400">
+              {enteros.format(puesto.diamonds)} <span className="text-xs text-muted">diamantes</span>
+            </p>
             <p className="text-xs text-muted">
               {puesto.orders} {puesto.orders === 1 ? "recarga" : "recargas"}
             </p>
@@ -83,7 +88,7 @@ export function RankingCard({
         </div>
       ) : (
         <p className="rounded-xl border border-line bg-abyss px-4 py-3 text-sm text-muted">
-          Todavía no tienes puesto este mes. Haz tu primera recarga y entras al ranking.
+          Todavía no tienes puesto este mes. Recarga diamantes de Free Fire y entras al ranking.
         </p>
       )}
 

@@ -26,6 +26,24 @@
   --color-plasma-400: #4fd8ff;
   --color-plasma-500: #16b6e8;
 
+  /*
+    Acento cálido, y SOLO para el ranking.
+
+    Ojo con los nombres: los tokens "flame" y "plasma" son azules —el nombre
+    quedó de una paleta anterior—, así que pintar algo de naranja con ellos es
+    imposible. El dueño pidió el ranking en rojo/naranja justamente para que
+    destaque sobre una tienda que es azul entera.
+  */
+  --color-crown-400: #ffb23f;
+  --color-crown-500: #ff7a18;
+  --color-crown-600: #e8420f;
+
+  /* Podio. El dueño premia a los tres primeros, así que se distinguen entre
+     sí y no solo del resto. */
+  --color-gold: #f5c542;
+  --color-silver: #c9d2de;
+  --color-bronze: #cd7f32;
+
   --color-ok: #35d07f;
   --color-warn: #f5b942;
   --color-danger: #ff5a5f;
@@ -198,11 +216,13 @@ body::before {
 }
 
 /*
-  Igual que `line-border` pero sin el tramo morado: el dueño pidió el banner
-  del ranking con un borde rojo/naranja, y el plasma lo apagaba justo encima
-  de las casillas de juego, que ya son muy coloridas.
+  Igual que `line-border`, pero en naranja y rojo de verdad.
+
+  La primera versión usaba los tokens "flame", que suenan a fuego pero son
+  azules, así que el borde salía celeste y no se distinguía del resto de la
+  tienda. Aquí van los `crown`, que sí son cálidos.
 */
-@utility line-border-flame {
+@utility line-border-crown {
   position: relative;
   isolation: isolate;
   border-radius: 20px;
@@ -222,11 +242,11 @@ body::before {
     background: conic-gradient(
       from 0turn,
       transparent 0turn 0.04turn,
-      var(--color-flame-500) 0.1turn,
-      var(--color-flame-400) 0.14turn,
+      var(--color-crown-600) 0.1turn,
+      var(--color-crown-500) 0.14turn,
       transparent 0.22turn 0.54turn,
-      var(--color-flame-400) 0.6turn,
-      var(--color-flame-500) 0.64turn,
+      var(--color-crown-500) 0.6turn,
+      var(--color-crown-400) 0.64turn,
       transparent 0.72turn 1turn
     );
     animation: border-spin 3.5s linear infinite;
@@ -296,7 +316,7 @@ body::before {
 
   /* El borde deja de girar: se queda como un contorno fijo, no parpadeando. */
   .line-border::before,
-  .line-border-flame::before { animation: none !important; }
+  .line-border-crown::before { animation: none !important; }
 
   /* La cascada del fondo se retira entera: quieta no aporta nada y unos logos
      congelados a media pantalla se leerían como un fallo de carga. */

@@ -221,17 +221,17 @@ export default async function HomePage() {
           con las casillas sin necesitar más tamaño.
         */}
         <div className="mt-8 flex justify-center sm:mt-10">
-          <Link href="/top" className="line-border-flame group block w-full max-w-md">
+          <Link href="/top" className="line-border-crown group block w-full max-w-md">
             <span className="flex items-center justify-center gap-2.5 rounded-[18px] bg-abyss px-4 py-3 text-sm sm:px-5 sm:py-3.5">
               <span aria-hidden className="text-base sm:text-lg">
                 🏆
               </span>
               <span className="font-black tracking-tight text-ink">
-                Top recargueros <span className="text-gradient-flame">del mes</span>
+                Top recargueros <span className="text-crown-400">del mes</span>
               </span>
               <span
                 aria-hidden
-                className="text-flame-400 transition-transform duration-300 group-hover:translate-x-1"
+                className="text-crown-400 transition-transform duration-300 group-hover:translate-x-1"
               >
                 →
               </span>

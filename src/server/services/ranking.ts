@@ -5,9 +5,13 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { diamantesDe } from "@/lib/diamantes";
 
 /**
- * Ranking mensual de recargas ("top recargueros").
+ * Ranking mensual de diamantes de Free Fire ("top recargueros").
+ *
+ * Cuenta SOLO diamantes de Free Fire: es lo que más vende la tienda y es la
+ * única moneda comparable entre compradores. Ver `lib/diamantes.ts`.
  *
  * ── POR QUÉ ESTÁ CACHEADO ───────────────────────────────────────────────────
  * Es una agregación sobre toda la tabla de pedidos y se muestra en una página
@@ -30,14 +34,16 @@ export interface FilaRanking {
   userId: string;
   /** El nombre con el que se registró. Ver la nota de privacidad más abajo. */
   name: string;
-  totalCents: number;
+  /** Diamantes de Free Fire acumulados en el mes. */
+  diamonds: number;
+  /** Recargas que aportaron diamantes; las demás compras no cuentan aquí. */
   orders: number;
 }
 
 export interface PuestoPropio {
   /** 1-indexado, tal y como se le muestra a la persona. */
   position: number;
-  totalCents: number;
+  diamonds: number;
   orders: number;
   /** true si además está entre los que se ven en la página pública. */
   inTopPublic: boolean;
@@ -58,35 +64,52 @@ export const TAMANO_TOP_PUBLICO = 10;
  * recuerda, y las entregas manuales pueden marcarse días después.
  */
 async function calcular(): Promise<FilaRanking[]> {
-  const filas = await db.execute<{
-    user_id: string;
-    name: string;
-    total_cents: number;
-    orders: number;
-  }>(sql`
-    SELECT o.user_id,
-           u.name,
-           SUM(o.price_cents)::int AS total_cents,
-           COUNT(*)::int           AS orders
+  const filas = await db.execute<{ user_id: string; name: string; product_name: string }>(sql`
+    SELECT o.user_id, u.name, o.product_name
     FROM orders o
     JOIN users u ON u.id = o.user_id
     WHERE o.status = 'COMPLETED'
+      AND o.game_name ILIKE '%free fire%'
       AND u.role = 'USER'
       AND u.status = 'ACTIVE'
       AND u.hide_from_ranking = false
       AND o.created_at >= (
         date_trunc('month', now() AT TIME ZONE 'America/Lima') AT TIME ZONE 'America/Lima'
       )
-    GROUP BY o.user_id, u.name
-    ORDER BY total_cents DESC, orders DESC, u.name ASC
   `);
 
-  return filas.rows.map((f) => ({
-    userId: f.user_id,
-    name: f.name,
-    totalCents: Number(f.total_cents),
-    orders: Number(f.orders),
-  }));
+  /*
+    La suma se hace aquí y no en SQL porque la cantidad de diamantes vive
+    dentro del nombre del paquete ("1060 + 106 Diamantes") y sacarla con
+    expresiones regulares de Postgres sería ilegible y, sobre todo,
+    imposible de probar. En JavaScript es `diamantesDe`, con sus pruebas.
+
+    El coste es traer las compras del mes, unos cientos de filas, una vez
+    cada cinco minutos. Barato frente a una consulta por visitante.
+  */
+  const porUsuario = new Map<string, FilaRanking>();
+
+  for (const f of filas.rows) {
+    const diamantes = diamantesDe(f.product_name);
+    if (diamantes <= 0) continue; // pases, membresías y Cajas Evo no cuentan
+
+    const actual = porUsuario.get(f.user_id);
+    if (actual) {
+      actual.diamonds += diamantes;
+      actual.orders += 1;
+    } else {
+      porUsuario.set(f.user_id, {
+        userId: f.user_id,
+        name: f.name,
+        diamonds: diamantes,
+        orders: 1,
+      });
+    }
+  }
+
+  return [...porUsuario.values()].sort(
+    (a, b) => b.diamonds - a.diamonds || b.orders - a.orders || a.name.localeCompare(b.name),
+  );
 }
 
 const rankingCacheado = unstable_cache(calcular, ["ranking-mensual"], {
@@ -113,7 +136,7 @@ export async function puestoDe(userId: string): Promise<PuestoPropio | null> {
   const fila = ranking[indice];
   return {
     position: indice + 1,
-    totalCents: fila.totalCents,
+    diamonds: fila.diamonds,
     orders: fila.orders,
     inTopPublic: indice < TAMANO_TOP_PUBLICO,
   };

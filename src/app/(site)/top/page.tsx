@@ -1,9 +1,33 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button, Card, EmptyState } from "@/components/ui";
-import { formatPEN } from "@/lib/money";
+
 import { getCurrentUser } from "@/lib/session";
 import { mesEnCurso, puestoDe, topPublico, TAMANO_TOP_PUBLICO } from "@/server/services/ranking";
+
+/** Miles con punto, como se leen los diamantes dentro del juego. */
+const enteros = new Intl.NumberFormat("es-PE");
+
+/**
+ * Los tres primeros se distinguen ENTRE SÍ, no solo del resto: el dueño da un
+ * premio distinto a cada uno, así que el puesto tiene que leerse de un vistazo
+ * sin contar filas.
+ */
+const PODIO = [
+  { nombre: "Oro", fila: "border-gold/45 bg-gold/5", disco: "bg-gold text-void", texto: "text-gold" },
+  {
+    nombre: "Plata",
+    fila: "border-silver/40 bg-silver/5",
+    disco: "bg-silver text-void",
+    texto: "text-silver",
+  },
+  {
+    nombre: "Bronce",
+    fila: "border-bronze/50 bg-bronze/10",
+    disco: "bg-bronze text-ink",
+    texto: "text-bronze",
+  },
+] as const;
 
 export const metadata: Metadata = {
   title: "Top recargueros",
@@ -39,8 +63,8 @@ export default async function TopPage() {
           Top <span className="text-gradient-flame">recargueros</span>
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
-          Los {TAMANO_TOP_PUBLICO} que más recargaron en {mesEnCurso()}. El primer día de cada mes
-          el ranking vuelve a cero y todos arrancan parejos.
+          Los {TAMANO_TOP_PUBLICO} que más diamantes de Free Fire recargaron en {mesEnCurso()}.
+          El primer día de cada mes el ranking vuelve a cero y todos arrancan parejos.
         </p>
       </div>
 
@@ -48,7 +72,7 @@ export default async function TopPage() {
         <Card className="rise rise-2 mt-6 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-faint">Tu puesto este mes</p>
-            <p className="text-2xl font-black tabular-nums text-flame-400">#{propio.position}</p>
+            <p className="text-2xl font-black tabular-nums text-crown-400">#{propio.position}</p>
           </div>
           <p className="text-right text-sm text-muted">
             {propio.inTopPublic
@@ -62,7 +86,7 @@ export default async function TopPage() {
         <div className="mt-8">
           <EmptyState
             title="El ranking de este mes está por empezar"
-            description="Todavía no hay recargas registradas este mes. El primero en recargar abre la tabla."
+            description="Todavía no hay recargas de diamantes este mes. El primero en recargar abre la tabla."
             action={
               <Link href="/#elige-juego">
                 <Button>Recargar ahora</Button>
@@ -74,23 +98,19 @@ export default async function TopPage() {
         <ol className="rise rise-3 mt-8 space-y-2">
           {top.map((fila, i) => {
             const puesto = i + 1;
-            const esPodio = puesto <= 3;
+            const medalla = PODIO[i];
             return (
               <li
                 key={fila.userId}
                 className={[
                   "flex items-center gap-4 rounded-2xl border px-4 py-3.5 transition-colors",
-                  esPodio
-                    ? "border-flame-500/30 bg-flame-500/5"
-                    : "border-line-soft bg-surface hover:border-line",
+                  medalla ? medalla.fila : "border-line-soft bg-surface hover:border-line",
                 ].join(" ")}
               >
                 <span
                   className={[
                     "grid size-9 shrink-0 place-items-center rounded-full text-sm font-black tabular-nums",
-                    esPodio
-                      ? "bg-flame-500 text-void"
-                      : "border border-line bg-abyss text-muted",
+                    medalla ? medalla.disco : "border border-line bg-abyss text-muted",
                   ].join(" ")}
                 >
                   {puesto}
@@ -98,13 +118,26 @@ export default async function TopPage() {
 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold leading-tight">{fila.name}</span>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    {fila.orders} {fila.orders === 1 ? "recarga" : "recargas"}
+                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+                    {medalla && (
+                      <span className={`font-bold uppercase tracking-wide ${medalla.texto}`}>
+                        {medalla.nombre}
+                      </span>
+                    )}
+                    {medalla && <span className="text-faint">·</span>}
+                    <span>
+                      {fila.orders} {fila.orders === 1 ? "recarga" : "recargas"}
+                    </span>
                   </span>
                 </span>
 
-                <span className="shrink-0 text-right font-bold tabular-nums text-ok">
-                  {formatPEN(fila.totalCents)}
+                <span className="shrink-0 text-right">
+                  <span className="block font-bold tabular-nums text-crown-400">
+                    {enteros.format(fila.diamonds)}
+                  </span>
+                  <span className="block text-[10px] uppercase tracking-wide text-faint">
+                    diamantes
+                  </span>
                 </span>
               </li>
             );
@@ -113,7 +146,8 @@ export default async function TopPage() {
       )}
 
       <p className="mt-8 text-xs leading-relaxed text-faint">
-        Aparece el nombre con el que cada persona se registró. Si no quieres salir en esta lista,
+        Solo cuentan los diamantes de Free Fire; los pases, membresías y las recargas de otros
+        juegos no suman en esta tabla. Aparece el nombre con el que cada persona se registró. Si no quieres salir en esta lista,
         puedes desactivarlo cuando quieras desde{" "}
         <Link href="/cuenta" className="underline hover:text-muted">
           tu cuenta
