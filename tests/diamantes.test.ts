@@ -1,23 +1,26 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { cuentaParaRanking, diamantesDe } from "@/lib/diamantes";
+import { cuentaParaRanking, diamantesDelNombre, diamantesRecibidos } from "@/lib/diamantes";
 
-describe("diamantesDe", () => {
+describe("diamantesDelNombre", () => {
   it("lee los nombres tal y como los manda el proveedor", () => {
-    assert.equal(diamantesDe("Recarga Free Fire - 1060 Diamantes"), 1060);
-    assert.equal(diamantesDe("110 Diamantes"), 110);
-    assert.equal(diamantesDe("Free Fire 5600 diamantes"), 5600);
+    assert.equal(diamantesDelNombre("Recarga Free Fire - 1060 Diamantes").cantidad, 1060);
+    assert.equal(diamantesDelNombre("110 Diamantes").cantidad, 110);
+    assert.equal(diamantesDelNombre("Free Fire 5600 diamantes").cantidad, 5600);
   });
 
-  it("suma el bono cuando el paquete lo trae aparte", () => {
-    assert.equal(diamantesDe("1060 + 106 Diamantes"), 1166);
-    assert.equal(diamantesDe("234 + 23 Diamonds"), 257);
+  it("suma el bono cuando el paquete lo trae desglosado", () => {
+    const a = diamantesDelNombre("1060 + 106 Diamantes");
+    assert.equal(a.cantidad, 1166);
+    assert.equal(a.desglosado, true);
+
+    assert.equal(diamantesDelNombre("234 + 23 Diamonds").cantidad, 257);
   });
 
   it("ignora los separadores de miles", () => {
-    assert.equal(diamantesDe("Recarga Free Fire - 1.060 Diamantes"), 1060);
-    assert.equal(diamantesDe("Recarga Free Fire - 1,060 Diamantes"), 1060);
+    assert.equal(diamantesDelNombre("Recarga Free Fire - 1.060 Diamantes").cantidad, 1060);
+    assert.equal(diamantesDelNombre("Recarga Free Fire - 1,060 Diamantes").cantidad, 1060);
   });
 
   /**
@@ -35,7 +38,29 @@ describe("diamantesDe", () => {
       "Pase Élite",
       "",
     ]) {
-      assert.equal(diamantesDe(nombre), 0, nombre);
+      assert.equal(diamantesDelNombre(nombre).cantidad, 0, nombre);
+    }
+  });
+});
+
+describe("diamantesRecibidos", () => {
+  it("agrega el 10% que regala la tienda", () => {
+    assert.equal(diamantesRecibidos("110 Diamantes"), 121);
+    assert.equal(diamantesRecibidos("Recarga Free Fire - 1060 Diamantes"), 1166);
+    assert.equal(diamantesRecibidos("Free Fire 5600 diamantes"), 6160);
+  });
+
+  /**
+   * El riesgo de este cambio: a un paquete que ya trae el bono escrito en el
+   * nombre no se le puede aplicar otra vez, o ese jugador sale inflado.
+   */
+  it("no vuelve a aplicar el bono si el nombre ya lo trae", () => {
+    assert.equal(diamantesRecibidos("1060 + 106 Diamantes"), 1166);
+  });
+
+  it("lo que no son diamantes sigue valiendo cero", () => {
+    for (const nombre of ["Membresía Mensual", "Pase Booyah", "20 Cajas Evo", "105 Oro"]) {
+      assert.equal(diamantesRecibidos(nombre), 0, nombre);
     }
   });
 });

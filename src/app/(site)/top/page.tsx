@@ -142,8 +142,8 @@ export default async function TopPage() {
       )}
 
       <p className="mt-8 text-xs leading-relaxed text-faint">
-        Solo cuentan los diamantes de Free Fire; los pases, membresías y las recargas de otros
-        juegos no suman en esta tabla. Aparece el nombre con el que cada persona se registró. Si no quieres salir en esta lista,
+        Solo cuentan los diamantes de Free Fire, con el 10% extra de cada paquete ya incluido;
+        los pases, membresías y las recargas de otros juegos no suman en esta tabla. Aparece el nombre con el que cada persona se registró. Si no quieres salir en esta lista,
         puedes desactivarlo cuando quieras desde{" "}
         <Link href="/cuenta" className="underline hover:text-muted">
           tu cuenta

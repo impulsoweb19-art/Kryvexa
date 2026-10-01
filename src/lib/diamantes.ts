@@ -23,19 +23,50 @@
  */
 const CANTIDAD = /([0-9][0-9.,]*(?:\s*\+\s*[0-9][0-9.,]*)*)\s*(?:diamantes?|diamonds?)\b/i;
 
-export function diamantesDe(productName: string): number {
-  const m = CANTIDAD.exec(productName ?? "");
-  if (!m) return 0;
+/** Bono que la tienda regala encima de cada paquete de diamantes. */
+const BONO = 0.1;
 
-  return m[1]
-    .split("+")
-    .reduce((total, parte) => {
-      const n = Number(parte.replace(/[^0-9]/g, ""));
-      return Number.isFinite(n) ? total + n : total;
-    }, 0);
+/**
+ * Lo que dice el nombre, sin interpretar nada.
+ *
+ * `desglosado` es true cuando el propio nombre separa el bono ("1060 + 106
+ * Diamantes"). Importa porque ese paquete YA lo trae contado y volver a
+ * aplicárselo lo contaría dos veces.
+ */
+export function diamantesDelNombre(productName: string): {
+  cantidad: number;
+  desglosado: boolean;
+} {
+  const m = CANTIDAD.exec(productName ?? "");
+  if (!m) return { cantidad: 0, desglosado: false };
+
+  const partes = m[1].split("+");
+  const cantidad = partes.reduce((total, parte) => {
+    const n = Number(parte.replace(/[^0-9]/g, ""));
+    return Number.isFinite(n) ? total + n : total;
+  }, 0);
+
+  return { cantidad, desglosado: partes.length > 1 };
+}
+
+/**
+ * Los diamantes que de verdad le entran al jugador: los del paquete más el
+ * 10% que regala la tienda.
+ *
+ * Es lo que cuenta el ranking, porque es la cifra que el jugador ve en su
+ * cuenta de Free Fire; el número del catálogo le resultaría más bajo de lo que
+ * recibió y parecería un error.
+ *
+ * Como el bono es el mismo para todos los paquetes, no altera el orden: sube
+ * a todo el mundo por igual.
+ */
+export function diamantesRecibidos(productName: string): number {
+  const { cantidad, desglosado } = diamantesDelNombre(productName);
+  if (cantidad <= 0) return 0;
+  return desglosado ? cantidad : Math.round(cantidad * (1 + BONO));
 }
 
 /** Si este pedido cuenta para el ranking de diamantes. */
 export function cuentaParaRanking(gameName: string, productName: string): boolean {
-  return /free\s*fire/i.test(gameName ?? "") && diamantesDe(productName) > 0;
+  return /free\s*fire/i.test(gameName ?? "") && diamantesRecibidos(productName) > 0;
 }

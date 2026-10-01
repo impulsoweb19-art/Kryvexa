@@ -5,7 +5,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { diamantesDe } from "@/lib/diamantes";
+import { diamantesRecibidos } from "@/lib/diamantes";
 
 /**
  * Ranking mensual de diamantes de Free Fire ("top recargueros").
@@ -82,7 +82,7 @@ async function calcular(): Promise<FilaRanking[]> {
     La suma se hace aquí y no en SQL porque la cantidad de diamantes vive
     dentro del nombre del paquete ("1060 + 106 Diamantes") y sacarla con
     expresiones regulares de Postgres sería ilegible y, sobre todo,
-    imposible de probar. En JavaScript es `diamantesDe`, con sus pruebas.
+    imposible de probar. En JavaScript es `diamantesRecibidos`, con sus pruebas.
 
     El coste es traer las compras del mes, unos cientos de filas, una vez
     cada cinco minutos. Barato frente a una consulta por visitante.
@@ -90,7 +90,7 @@ async function calcular(): Promise<FilaRanking[]> {
   const porUsuario = new Map<string, FilaRanking>();
 
   for (const f of filas.rows) {
-    const diamantes = diamantesDe(f.product_name);
+    const diamantes = diamantesRecibidos(f.product_name);
     if (diamantes <= 0) continue; // pases, membresías y Cajas Evo no cuentan
 
     const actual = porUsuario.get(f.user_id);
