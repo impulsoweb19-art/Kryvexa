@@ -15,6 +15,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${base}/`, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${base}/tienda`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // Pública y cambia con cada compra; es la única página con contenido
+    // propio que se renueva solo.
+    { url: `${base}/top`, lastModified: now, changeFrequency: "daily", priority: 0.7 },
     { url: `${base}/login`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: `${base}/registro`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
     { url: `${base}/recuperar`, lastModified: now, changeFrequency: "monthly", priority: 0.1 },
