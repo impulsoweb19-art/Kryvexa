@@ -5,6 +5,7 @@ import { providerTransactions } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger, redact } from "@/lib/logger";
 import { ProviderRequestError } from "../types";
+import { opcionesDeSalida } from "../salida";
 
 /**
  * Cliente HTTP de EpinBy.
@@ -140,6 +141,9 @@ export async function requestEnvelope<T>(opts: RequestOptions): Promise<ApiEnvel
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
       cache: "no-store",
+      // Vacío mientras no haya servidor con IP fija; entonces esto no hace
+      // nada y la llamada sale igual que siempre. Ver `../salida.ts`.
+      ...opcionesDeSalida(),
     });
 
     httpStatus = res.status;

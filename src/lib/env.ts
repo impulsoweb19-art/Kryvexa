@@ -21,6 +21,13 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL es obligatoria"),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET debe tener al menos 32 caracteres"),
 
+  /**
+   * Salida con IP fija para hablar con los proveedores (ver
+   * `server/providers/salida.ts`). Vacía = salida directa, como siempre.
+   * Formato: http://usuario:clave@ip-del-servidor:puerto
+   */
+  PROVIDER_PROXY_URL: z.string().default(""),
+
   RECARGAS_AMERICA_BASE_URL: z.string().url().default("https://panel.recargasamerica.com/api/v1"),
   RECARGAS_AMERICA_API_KEY: z.string().default(""),
   RECARGAS_AMERICA_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
