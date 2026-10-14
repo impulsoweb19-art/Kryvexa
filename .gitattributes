@@ -1,0 +1,6 @@
+# Los scripts que se ejecutan en Linux van SIEMPRE con saltos de línea Unix.
+#
+# Sin esto, Git los entrega con saltos de Windows al clonar en Windows, y el
+# servidor responde `$'\r': command not found` en la primera línea. Pasó el
+# 14/10/2026 instalando el servidor de salida.
+*.sh text eol=lf
