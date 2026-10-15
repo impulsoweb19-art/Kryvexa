@@ -211,6 +211,10 @@ async function main() {
     gameName?: string;
     /** Si se define, manda sobre el orden calculado a partir del costo. */
     sortOrder?: number;
+    /** Texto que se muestra en la tienda y al confirmar la compra. */
+    description?: string;
+    /** false = cargado pero no a la venta. Por defecto se vende. */
+    visible?: boolean;
   }> = [
     { externalId: "manual-pase-booyah", packageName: "Pase Booyah", costSoles: 3.0 },
     { externalId: "manual-membresia-semanal", packageName: "Membresía Semanal", costSoles: 6.5 },
@@ -238,6 +242,58 @@ async function main() {
     { externalId: "manual-fragmentos-evo-300", packageName: "300 Fragmentos Evo", costSoles: 36.0, priceSoles: 45.0 },
     { externalId: "manual-fragmentos-evo-600", packageName: "600 Fragmentos Evo", costSoles: 56.8, priceSoles: 71.0 },
     { externalId: "manual-fragmentos-evo-1200", packageName: "1200 Fragmentos Evo", costSoles: 110.4, priceSoles: 138.0 },
+
+    /*
+      LIKES DE FREE FIRE — entrega manual y LENTA.
+
+      El proveedor del dueño los envía a razón de ~200 al día, así que el
+      paquete de 5000 tarda unas cuatro semanas y el de 20000 más de tres
+      meses. Por eso cada uno lleva descripción: vender una entrega de meses
+      sin decirlo es la forma más rápida de ganarse una devolución.
+
+      `visible: false` hasta que el dueño dé los precios de venta. Un
+      producto a S/0 sería comprable gratis, y uno con un precio inventado
+      le costaría dinero real.
+    */
+    {
+      externalId: "manual-likes-ff-2000",
+      packageName: "2000 Likes Free Fire — envío único",
+      costSoles: 0,
+      priceSoles: 0,
+      visible: false,
+      description: `Entre 1800 y 2000 likes en un solo envío, no repartidos por día.
+
+Puede tardar hasta 48 horas en realizarse.
+
+Compatible con todas las regiones. Solo necesitamos tu ID de jugador.`,
+      sortOrder: 19,
+    },
+    {
+      externalId: "manual-likes-ff-5000",
+      packageName: "5000 Likes Free Fire",
+      costSoles: 0,
+      priceSoles: 0,
+      visible: false,
+      description: `5000 likes para destacar tu cuenta de Free Fire.
+
+Se entregan poco a poco, unos 200 por día, así que el paquete completo tarda alrededor de un mes. No llegan todos de golpe.
+
+Compatible con todas las regiones. Solo necesitamos tu ID de jugador.`,
+      sortOrder: 20,
+    },
+    {
+      externalId: "manual-likes-ff-20000",
+      packageName: "20000 Likes Free Fire",
+      costSoles: 0,
+      priceSoles: 0,
+      visible: false,
+      description: `20000 likes para destacar tu cuenta de Free Fire.
+
+Se entregan poco a poco, unos 200 por día. A ese ritmo el paquete completo tarda alrededor de tres meses. Si buscas algo rápido, este no es el paquete.
+
+Compatible con todas las regiones. Solo necesitamos tu ID de jugador.`,
+      sortOrder: 21,
+    },
 
     /*
       BLOOD STRIKE — todo de entrega manual, sin proveedor conectado.
@@ -331,8 +387,10 @@ async function main() {
         packageName: item.packageName,
         costUsdCents,
         priceCents,
+        description: item.description ?? null,
         inputFields: sql`${JSON.stringify(MANUAL_INPUTS)}::jsonb`,
         validationSupported: false,
+        visible: item.visible ?? true,
         sortOrder: item.sortOrder ?? Math.min(9999, Math.round(costUsdCents / 100)),
         lastSyncedAt: new Date(),
       })

@@ -51,8 +51,24 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
+            {product.description && (
+              <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted">
+                {product.description}
+              </p>
+            )}
+
+            {/*
+              Antes esto decía "Entrega automática" SIEMPRE, incluso en los
+              productos que el dueño entrega a mano: Blood Strike, las Cajas
+              Evo, las membresías. Prometer inmediatez y tardar horas genera
+              más reclamos que avisarlo de entrada.
+            */}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Badge tone="info">Entrega automática</Badge>
+              {product.providerCode === "manual" ? (
+                <Badge tone="warn">Entrega manual</Badge>
+              ) : (
+                <Badge tone="info">Entrega automática</Badge>
+              )}
               {product.validationSupported ? (
                 <Badge tone="ok">ID verificable antes de pagar</Badge>
               ) : (

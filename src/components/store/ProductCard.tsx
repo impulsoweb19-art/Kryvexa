@@ -45,6 +45,14 @@ export function ProductCard({
           {product.validationSupported && <Badge tone="info">ID verificable</Badge>}
         </div>
 
+        {/* Recortada a dos líneas: aquí solo tiene que despertar la duda. El
+            texto completo está en la pantalla de compra, antes de pagar. */}
+        {product.description && (
+          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted">
+            {product.description}
+          </p>
+        )}
+
         <div className="mt-4 flex flex-col items-start gap-2 sm:mt-6 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
           <div>
             <span className="block text-xl font-black tabular-nums text-flame-400 sm:text-2xl">

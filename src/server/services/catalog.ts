@@ -40,6 +40,13 @@ export interface StoreProduct {
   externalId: string;
   gameName: string;
   packageName: string;
+  /**
+   * Texto libre que escribe el administrador. Null en casi todo el catálogo:
+   * un paquete de diamantes se explica solo con su nombre. Importa en lo que
+   * NO es evidente — los likes, por ejemplo, se entregan a razón de 200 por
+   * día y el comprador tiene que saberlo ANTES de pagar.
+   */
+  description: string | null;
   kind: Product["kind"];
   priceCents: number;
   inputFields: ProviderInputField[];
@@ -93,6 +100,7 @@ export function toStoreProduct(product: Product, config: StoreConfig): StoreProd
     externalId: product.externalId,
     gameName: product.gameName,
     packageName: product.packageName,
+    description: product.description,
     kind: product.kind,
     priceCents: sellPriceCents(product, config),
     inputFields: (product.inputFields as ProviderInputField[]) ?? [],
