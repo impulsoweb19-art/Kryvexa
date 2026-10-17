@@ -27,6 +27,44 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
   const [message, setMessage] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [purchasesEnabled, setPurchasesEnabled] = useState(initial.purchasesEnabled);
+  const [cambiandoCompras, setCambiandoCompras] = useState(false);
+
+  /**
+   * El interruptor de compras se guarda SOLO, sin pulsar "Guardar".
+   *
+   * Es lo que lo diferencia del resto del formulario: se usa cuando el
+   * proveedor se cayó y los pedidos se acumulan en revisión. Antes había que
+   * desmarcarlo y bajar hasta el final de la pantalla, y si no lo hacías el
+   * cambio se perdía al recargar — que es exactamente lo que le pasó al dueño
+   * el 17/10/2026, tres veces seguidas, con la tienda vendiendo.
+   */
+  async function cambiarCompras(enabled: boolean) {
+    setCambiandoCompras(true);
+    setMessage(null);
+    setPurchasesEnabled(enabled); // optimista: el interruptor responde al toque
+    try {
+      const res = await fetch("/api/admin/settings/compras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) throw new Error(json?.error ?? "No se pudo guardar el cambio.");
+
+      setMessage({
+        tone: "ok",
+        text: enabled
+          ? "Compras reanudadas. La tienda ya vende con normalidad."
+          : "Compras PAUSADAS. Nadie puede comprar hasta que vuelvas a activarlas.",
+      });
+      router.refresh();
+    } catch (err) {
+      setPurchasesEnabled(!enabled); // se revierte: que no quede creyendo que pausó
+      setMessage({ tone: "danger", text: (err as Error).message });
+    } finally {
+      setCambiandoCompras(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,6 +85,8 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
       exchangeRate: Number(form.get("exchangeRate")),
       marginBps: Math.round(Number(form.get("marginPercent")) * 100),
       minDepositCents: Math.round(Number(form.get("minDeposit")) * 100),
+      // Se envía el valor actual porque el esquema lo exige, pero quien manda
+      // de verdad es el interruptor de arriba, que guarda al instante.
       purchasesEnabled,
     });
 
@@ -139,18 +179,26 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
           </Field>
         </div>
 
-        <label className="flex items-center gap-3 rounded-xl border border-line bg-abyss p-4">
+        <label
+          className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
+            purchasesEnabled ? "border-line bg-abyss" : "border-danger/50 bg-danger/10"
+          }`}
+        >
           <input
             type="checkbox"
             checked={purchasesEnabled}
-            onChange={(e) => setPurchasesEnabled(e.target.checked)}
+            disabled={cambiandoCompras}
+            onChange={(e) => cambiarCompras(e.target.checked)}
             className="size-4 accent-flame-500"
           />
           <span className="text-sm">
-            <strong className="block">Compras habilitadas</strong>
-            <span className="text-muted">
-              Desactívalo para pausar todas las compras sin apagar la tienda (interruptor de
-              emergencia).
+            <strong className="block">
+              {purchasesEnabled ? "Compras habilitadas" : "COMPRAS PAUSADAS"}
+            </strong>
+            <span className={purchasesEnabled ? "text-muted" : "text-danger"}>
+              {purchasesEnabled
+                ? "Desactívalo para pausar todas las compras sin apagar la tienda. Se guarda solo, no hace falta pulsar Guardar."
+                : "Ahora mismo nadie puede comprar. Vuelve a marcarlo cuando el proveedor esté operativo."}
             </span>
           </span>
         </label>

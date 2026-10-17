@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LogoMark } from "@/components/brand/Logo";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { requireAdminPage } from "@/lib/guards";
+import { getConfig } from "@/server/services/settings";
 
 /**
  * Layout del panel.
@@ -14,7 +15,7 @@ import { requireAdminPage } from "@/lib/guards";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = await requireAdminPage();
+  const [admin, config] = await Promise.all([requireAdminPage(), getConfig()]);
 
   return (
     <div className="relative flex min-h-dvh flex-col">
@@ -46,6 +47,25 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
         <AdminNav />
       </header>
+
+      {/*
+        La tienda pausada se avisa en TODAS las pantallas del panel, no solo en
+        Configuración. El interruptor se usa cuando el proveedor se cae, y el
+        riesgo real no es olvidarse de pausar: es olvidarse de reanudar y pasar
+        el día sin vender creyendo que no entró nadie.
+      */}
+      {!config.purchasesEnabled && (
+        <div className="border-b border-danger/40 bg-danger/15">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm sm:px-6">
+            <span className="font-semibold text-danger">
+              Las compras están PAUSADAS — nadie puede comprar en la tienda.
+            </span>
+            <Link href="/admin/configuracion" className="underline hover:text-ink">
+              Reanudar
+            </Link>
+          </div>
+        </div>
+      )}
 
       <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6">{children}</main>
     </div>
