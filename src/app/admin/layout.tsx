@@ -3,6 +3,7 @@ import { LogoMark } from "@/components/brand/Logo";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { requireAdminPage } from "@/lib/guards";
 import { getConfig } from "@/server/services/settings";
+import { estadoDeFusibles } from "@/server/services/breaker";
 
 /**
  * Layout del panel.
@@ -15,7 +16,12 @@ import { getConfig } from "@/server/services/settings";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [admin, config] = await Promise.all([requireAdminPage(), getConfig()]);
+  const [admin, config, fusibles] = await Promise.all([
+    requireAdminPage(),
+    getConfig(),
+    estadoDeFusibles().catch(() => []),
+  ]);
+  const cortados = fusibles.filter((f) => f.cortado);
 
   return (
     <div className="relative flex min-h-dvh flex-col">
@@ -54,6 +60,33 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         riesgo real no es olvidarse de pausar: es olvidarse de reanudar y pasar
         el día sin vender creyendo que no entró nadie.
       */}
+      {/*
+        Un proveedor cortado por el fusible automático. Se avisa aunque no haga
+        falta actuar —se reabre solo— porque explica por qué bajaron las ventas
+        esta tarde sin que nadie tocara nada.
+      */}
+      {cortados.length > 0 && (
+        <div className="border-b border-warn/40 bg-warn/15">
+          <div className="mx-auto max-w-7xl px-4 py-2.5 text-sm sm:px-6">
+            {cortados.map((f) => (
+              <p key={f.providerCode} className="text-warn">
+                <span className="font-semibold">{f.providerCode}</span> está cortado
+                automáticamente: no respondió {f.consecutiveFailures} veces seguidas. Sus recargas
+                están pausadas y se reanudarán solas en cuanto vuelva a responder
+                {f.proximaPrueba
+                  ? ` (próxima comprobación ~${f.proximaPrueba.toLocaleTimeString("es-PE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: "America/Lima",
+                    })})`
+                  : ""}
+                . Los demás juegos siguen vendiendo.
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!config.purchasesEnabled && (
         <div className="border-b border-danger/40 bg-danger/15">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm sm:px-6">

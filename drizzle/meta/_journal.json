@@ -43,6 +43,13 @@
       "when": 1790650006671,
       "tag": "0005_naive_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792270499861,
+      "tag": "0006_last_ultimates",
+      "breakpoints": true
     }
   ]
 }

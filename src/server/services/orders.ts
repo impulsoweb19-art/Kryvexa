@@ -9,6 +9,12 @@ import { logger } from "@/lib/logger";
 import { applyTransaction, ensureWallet } from "./wallet";
 import { sendManualOrderNotification } from "@/lib/whatsapp";
 import { getPurchasableProduct, sellPriceCents } from "./catalog";
+import {
+  asegurarProveedorDisponible,
+  esCaidaDelProveedor,
+  registrarExito,
+  registrarFallo,
+} from "./breaker";
 import { recordAudit } from "./audit";
 import { getProvider } from "@/server/providers/registry";
 import { ProviderRequestError } from "@/server/providers/recargas-america/client";
@@ -107,6 +113,15 @@ function describeInputs(product: Product, inputs: Record<string, string>): strin
 
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const { product, config } = await getPurchasableProduct(input.productId);
+
+  /*
+    Antes de nada: si el proveedor lleva varios fallos seguidos, esta compra
+    no llega a existir. Es la diferencia entre decirle al comprador "vuelve en
+    unos minutos" y cobrarle, no entregarle, y que el dueño lo resuelva a mano
+    al día siguiente. Ver `services/breaker.ts`.
+  */
+  await asegurarProveedorDisponible(product.providerCode);
+
   const priceCents = sellPriceCents(product, config);
 
   // El precio del cliente NUNCA manda: aquí solo se compara.
@@ -213,6 +228,12 @@ async function executePurchase(order: Order, product: Product): Promise<Order> {
   } catch (e) {
     const err = e as ProviderRequestError;
 
+    // Solo cuentan los fallos de "no contesta": un ID inválido es el
+    // proveedor funcionando bien y diciendo que no.
+    if (esCaidaDelProveedor(e)) {
+      void registrarFallo(order.providerCode, err.kind ?? "DESCONOCIDO", (e as Error).message);
+    }
+
     if (err instanceof ProviderRequestError && err.resultUnknown) {
       // No sabemos si se entregó. NO se reembolsa: se deja para conciliar.
       logger.warn("Resultado desconocido del proveedor; la orden queda pendiente", {
@@ -242,6 +263,9 @@ async function executePurchase(order: Order, product: Product): Promise<Order> {
       failureMessage: "El proveedor reportó un error. Verifica en su panel antes de devolver el saldo.",
     });
   }
+
+  // Llegó respuesta del proveedor: esté entregado o rechazado, está vivo.
+  void registrarExito(order.providerCode);
 
   switch (result.status) {
     case "COMPLETED":

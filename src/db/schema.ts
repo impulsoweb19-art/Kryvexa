@@ -439,6 +439,38 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 }));
 
 /**
+ * Corte automático por proveedor ("fusible").
+ *
+ * El proveedor de Free Fire se satura los días de evento, justo cuando más se
+ * vende. Mientras está caído, cada compra cobra el saldo del comprador y
+ * acaba en NEEDS_REVIEW, y el dueño tiene que resolverlas una por una.
+ *
+ * El interruptor manual de la configuración existe, pero depende de que él
+ * esté despierto y se dé cuenta. Esto lo hace solo: tras varios fallos
+ * seguidos se corta ESE proveedor —no la tienda entera, lo manual y los demás
+ * juegos siguen vendiendo— y se reabre solo cuando el proveedor vuelve a
+ * responder.
+ *
+ * Una fila por proveedor. `openedAt` vacío significa que vende con
+ * normalidad; es el mismo criterio que `redeemedAt` en los códigos.
+ */
+export const providerBreakers = pgTable("provider_breakers", {
+  providerCode: varchar("provider_code", { length: 40 }).primaryKey(),
+  /** Solo cuentan los fallos de "no contesta", nunca los de negocio. */
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  /**
+   * Cuántas veces seguidas se reabrió tras una prueba fallida. Alarga la
+   * espera entre pruebas: si el proveedor lleva media hora caído, no tiene
+   * sentido preguntarle cada tres minutos.
+   */
+  reopenCount: integer("reopen_count").notNull().default(0),
+  lastFailureKind: varchar("last_failure_kind", { length: 32 }),
+  lastFailureMessage: text("last_failure_message"),
+  updatedAt: updatedAt(),
+});
+
+/**
  * Códigos de canje para promociones y sorteos.
  *
  * Cada código sirve UNA sola vez en toda la tienda: el primero que lo canjea
