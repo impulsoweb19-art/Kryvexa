@@ -306,3 +306,68 @@ export interface Comprable {
   productId: string;
   priceCents: number;
 }
+
+/**
+ * Comprueba, ANTES de cobrar, que ese jugador de verdad tiene esa promoción.
+ *
+ * No basta con que la pantalla de consulta la haya mostrado. Quien tenga el
+ * enlace directo del artículo puede entrar sin pasar por la consulta, y el
+ * dueño no puede entregar una promoción que Garena no le ofrece a esa cuenta:
+ * acabaría devolviendo el dinero y quedando mal.
+ *
+ * En la práctica casi nunca cuesta cuota: el comprador acaba de consultar y la
+ * respuesta sigue en la caché de media hora.
+ *
+ * Si la comprobación no se puede hacer, se BLOQUEA la compra. Vender algo que
+ * no se va a poder entregar es peor que perder una venta.
+ */
+export async function asegurarPromocionDisponible(
+  externalId: string,
+  uid: string | undefined,
+): Promise<void> {
+  if (!uid || !/^[0-9]{8,15}$/.test(uid)) {
+    throw new AppError("VALIDATION_ERROR", {
+      userMessage: "Necesitamos tu ID de jugador para comprobar esta promoción.",
+    });
+  }
+
+  let cuenta: ResultadoConsulta;
+  try {
+    cuenta = await consultarCuenta(uid);
+  } catch {
+    throw new AppError("PROVIDER_NOT_CONFIGURED", {
+      userMessage:
+        "No pudimos comprobar si tu cuenta tiene esta promoción. Inténtalo en unos minutos; " +
+        "no te hemos cobrado nada.",
+    });
+  }
+
+  const nivel = externalId.startsWith("manual-levelup-")
+    ? externalId.slice("manual-levelup-".length)
+    : null;
+  if (nivel) {
+    if (cuenta.faltaNivel) throw noSePudoComprobar();
+    if (!cuenta.packages.some((p) => p.itemId === nivel)) throw noDisponible();
+    return;
+  }
+
+  const diamantes = Number(externalId.slice("manual-oferta-rd-".length));
+  if (cuenta.faltaOfertas) throw noSePudoComprobar();
+  if (!cuenta.offers.some((o) => o.diamonds === diamantes)) throw noDisponible();
+}
+
+function noSePudoComprobar() {
+  return new AppError("PROVIDER_NOT_CONFIGURED", {
+    userMessage:
+      "No pudimos comprobar si tu cuenta tiene esta promoción. Inténtalo en unos minutos; " +
+      "no te hemos cobrado nada.",
+  });
+}
+
+function noDisponible() {
+  return new AppError("PRODUCT_UNAVAILABLE", {
+    userMessage:
+      "Tu cuenta no tiene esta promoción disponible. Estas ofertas dependen de cada cuenta: " +
+      "consulta las tuyas en Mis promociones.",
+  });
+}

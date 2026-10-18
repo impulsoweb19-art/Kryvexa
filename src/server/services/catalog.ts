@@ -127,6 +127,25 @@ export function toStoreProduct(product: Product, config: StoreConfig): StoreProd
  * RecargasAmérica, que puede producir cosas como "Recarga Free" en vez de
  * "Free Fire" si el nombre del producto no calza con el patrón esperado).
  */
+/**
+ * Un artículo que solo existe para una promoción concreta de una cuenta
+ * concreta: los paquetes de aumento de nivel y las ofertas de primera recarga.
+ *
+ * NUNCA se listan en la tienda. No son productos que cualquiera pueda comprar:
+ * son lo que Garena le ofrece a ESE jugador, y el dueño solo puede entregarlos
+ * a quien de verdad los tenga disponibles. Se llega a ellos desde
+ * /promociones, después de comprobarlo con el proveedor.
+ *
+ * Se reconocen por el `externalId` y no por el nombre, igual que las
+ * categorías de Evo: el nombre lo puede cambiar el dueño desde su panel, el
+ * identificador no.
+ */
+export function esPromocionDeCuenta(p: Pick<Product, "externalId">): boolean {
+  return (
+    p.externalId.startsWith("manual-levelup-") || p.externalId.startsWith("manual-oferta-rd-")
+  );
+}
+
 export async function listStoreProducts(filter?: (p: Product) => boolean): Promise<StoreProduct[]> {
   const config = await getConfig();
   const rows = await db
@@ -135,7 +154,12 @@ export async function listStoreProducts(filter?: (p: Product) => boolean): Promi
     .where(and(eq(products.visible, true), eq(products.active, true)))
     .orderBy(asc(products.sortOrder), asc(products.costUsdCents));
 
-  const filtered = filter ? rows.filter(filter) : rows;
+  // La exclusión va aquí y no en cada filtro: que una promoción no se liste no
+  // es una decisión de una pantalla, es una propiedad del artículo. Ponerlo en
+  // los filtros significaría acordarse de repetirlo en la próxima pantalla que
+  // alguien añada, y olvidarlo deja promociones a la venta para cualquiera.
+  const visibles = rows.filter((p) => !esPromocionDeCuenta(p));
+  const filtered = filter ? visibles.filter(filter) : visibles;
   return filtered.map((p) => toStoreProduct(p, config));
 }
 

@@ -8,7 +8,8 @@ import { humanCode } from "@/lib/ids";
 import { logger } from "@/lib/logger";
 import { applyTransaction, ensureWallet } from "./wallet";
 import { sendManualOrderNotification } from "@/lib/whatsapp";
-import { getPurchasableProduct, sellPriceCents } from "./catalog";
+import { esPromocionDeCuenta, getPurchasableProduct, sellPriceCents } from "./catalog";
+import { asegurarPromocionDisponible } from "./sixoff";
 import {
   asegurarProveedorDisponible,
   esCaidaDelProveedor,
@@ -121,6 +122,16 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     al día siguiente. Ver `services/breaker.ts`.
   */
   await asegurarProveedorDisponible(product.providerCode);
+
+  /*
+    Las promociones no se listan en la tienda, pero el enlace directo existe.
+    Sin esto, cualquiera podría comprar un paquete de nivel que su cuenta no
+    tiene, y el dueño tendría que devolverle el dinero después de no poder
+    entregarlo. Se comprueba contra el proveedor antes de cobrar.
+  */
+  if (esPromocionDeCuenta(product)) {
+    await asegurarPromocionDisponible(product.externalId, input.inputs.input1);
+  }
 
   const priceCents = sellPriceCents(product, config);
 
