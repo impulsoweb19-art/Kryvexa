@@ -54,7 +54,7 @@ import type { SessionUser } from "@/lib/session";
  *      una. "El proveedor dijo que falló" no prueba que no gastara nada.
  */
 
-const MAX_RECONCILE_ATTEMPTS = 12; // ≈ 24 min con el cron cada 2 minutos
+const MAX_RECONCILE_ATTEMPTS = 12; // ≈ 1 h con el cron cada 5 minutos
 
 export interface CreateOrderInput {
   user: SessionUser;
