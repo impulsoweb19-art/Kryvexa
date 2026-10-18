@@ -98,6 +98,14 @@ export default async function StorePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/*
+            Las promociones dependen de cada cuenta y nadie las busca si no
+            sabe que existen. Aquí, al lado del saldo, es donde el comprador
+            ya está mirando antes de elegir paquete.
+          */}
+          <Link href="/promociones">
+            <Button variant="secondary">Mis promociones</Button>
+          </Link>
           <Link href="/tienda/canjear">
             <Button variant="secondary">Canjear código</Button>
           </Link>
