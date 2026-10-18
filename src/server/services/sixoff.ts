@@ -283,3 +283,26 @@ export async function consultarCuenta(uid: string): Promise<ResultadoConsulta> {
     faltaOfertas: !o,
   };
 }
+
+// ── Enlace con el catálogo ───────────────────────────────────────────────────
+
+/**
+ * Convención que une una promoción de Garena con el artículo que la vende.
+ *
+ * Las promociones NO son productos de la tienda: son lo que Garena le ofrece a
+ * esa cuenta concreta. Para que el comprador pueda pagarlas con su saldo, el
+ * dueño crea un artículo manual por cada una con este `externalId`, le pone el
+ * precio que quiera desde su panel, y aquí se cruzan.
+ *
+ * Los paquetes de nivel tienen catálogo fijo (4790…4795), así que se atan por
+ * `itemId`. Las ofertas RD no: sus IDs cambian según la tienda PayPal de cada
+ * cuenta, así que se atan por la CANTIDAD DE DIAMANTES, que sí es estable.
+ */
+export const externalIdDeNivel = (itemId: string) => `manual-levelup-${itemId}`;
+export const externalIdDeOferta = (diamonds: number) => `manual-oferta-rd-${diamonds}`;
+
+/** Lo que necesita el botón de comprar. */
+export interface Comprable {
+  productId: string;
+  priceCents: number;
+}

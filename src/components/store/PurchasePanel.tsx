@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Badge, Button, Field, Input, ORDER_STATUS_META } from "@/components/ui";
@@ -66,8 +66,18 @@ export function PurchasePanel({
 }) {
   const router = useRouter();
 
+  /**
+   * La pantalla de promociones manda el ID ya escrito en la URL. Volver a
+   * pedírselo al comprador, que acaba de teclearlo, es una invitación a
+   * equivocarse — y un ID mal copiado es lo que costó cuatro pedidos
+   * cancelados en setiembre.
+   */
+  const uidDeLaUrl = (useSearchParams().get("uid") ?? "").replace(/[^0-9]/g, "");
+
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(product.inputFields.map((f) => [f.name, ""])),
+    Object.fromEntries(
+      product.inputFields.map((f, i) => [f.name, i === 0 ? uidDeLaUrl : ""]),
+    ),
   );
   /**
    * `supported:false` significa "este producto no se puede verificar", no "el

@@ -2,22 +2,31 @@
 
 import { useState, type FormEvent } from "react";
 import { Alert, Badge, Button, Card, Field, Input } from "@/components/ui";
-import type { ResultadoConsulta } from "@/server/services/sixoff";
+import Link from "next/link";
+import { formatPEN } from "@/lib/money";
+import type { Comprable, ResultadoConsulta } from "@/server/services/sixoff";
+
+/** Lo que devuelve la ruta: la consulta más qué se puede comprar de ella. */
+type Respuesta = ResultadoConsulta & { comprables: Record<string, Comprable> };
 
 /**
  * Consulta de ofertas y paquetes de nivel de una cuenta de Free Fire.
  *
- * El resultado NO es un botón de compra: estos productos los entrega el dueño
- * a mano con un proveedor aparte. Aquí el comprador averigua qué tiene
- * disponible y con eso escribe por WhatsApp. Por eso la pantalla termina en
- * "escríbenos" y no en "comprar" — prometer un botón que no existe sería peor
- * que no tener la pantalla.
+ * Lo que el jugador tiene disponible se cruza con lo que el dueño vende: cada
+ * promoción con artículo creado lleva a comprarla CON SALDO de la tienda,
+ * igual que los pases y los likes, y entra en su cola de entrega manual. La
+ * que no tenga artículo se muestra sin botón, porque enviar a una compra que
+ * no existe es peor que no ofrecerla.
+ *
+ * El ID viaja a la pantalla de compra ya escrito: el comprador acaba de
+ * teclearlo aquí y volver a pedírselo es una invitación a equivocarse — que es
+ * exactamente lo que costó cuatro pedidos cancelados en setiembre.
  */
 export function ConsultaCuenta({ whatsapp }: { whatsapp: string }) {
   const [uid, setUid] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<ResultadoConsulta | null>(null);
+  const [resultado, setResultado] = useState<Respuesta | null>(null);
 
   async function consultar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,12 +41,26 @@ export function ConsultaCuenta({ whatsapp }: { whatsapp: string }) {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) throw new Error(json?.error ?? "No pudimos consultar.");
-      setResultado(json.data as ResultadoConsulta);
+      setResultado(json.data as Respuesta);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setCargando(false);
     }
+  }
+
+  /**
+   * Un artículo por promoción, con el ID del jugador ya puesto. Si el dueño no
+   * ha creado el artículo todavía, no hay botón: se informa y punto.
+   */
+  function Comprar({ itemId }: { itemId: string }) {
+    const c = resultado?.comprables[itemId];
+    if (!c) return <Badge tone="neutral">Consúltanos</Badge>;
+    return (
+      <Link href={`/tienda/${c.productId}?uid=${encodeURIComponent(resultado!.uid)}`}>
+        <Button size="sm">Comprar · {formatPEN(c.priceCents)}</Button>
+      </Link>
+    );
   }
 
   const nada =
@@ -102,7 +125,7 @@ export function ConsultaCuenta({ whatsapp }: { whatsapp: string }) {
                     className="flex items-center gap-3 rounded-xl border border-line-soft bg-abyss px-4 py-3"
                   >
                     <span className="flex-1 font-semibold">{p.name}</span>
-                    <Badge tone="ok">Disponible</Badge>
+                    <Comprar itemId={p.itemId} />
                   </li>
                 ))}
               </ul>
@@ -127,6 +150,7 @@ export function ConsultaCuenta({ whatsapp }: { whatsapp: string }) {
                     {o.discountPercent !== null && (
                       <Badge tone="ok">-{Math.round(o.discountPercent)}%</Badge>
                     )}
+                    <Comprar itemId={o.itemId} />
                   </li>
                 ))}
               </ul>
@@ -140,22 +164,14 @@ export function ConsultaCuenta({ whatsapp }: { whatsapp: string }) {
             </Alert>
           )}
 
-          {(resultado.packages.length > 0 || resultado.offers.length > 0) && whatsapp && (
-            <Card className="space-y-3 border-flame-500/30">
-              <p className="text-sm text-muted">
-                Estos productos los activamos a mano. Escríbenos con tu ID y te decimos el precio.
-              </p>
-              <a
-                href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-                  `Hola, consulté mi cuenta ${resultado.uid} (${resultado.nickname ?? "sin nombre"}) y me aparecen promociones disponibles. Quisiera más información.`,
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button fullWidth>Escribir por WhatsApp</Button>
-              </a>
-            </Card>
+          {(resultado.packages.length > 0 || resultado.offers.length > 0) && (
+            <p className="text-xs leading-relaxed text-faint">
+              Se pagan con tu saldo de la tienda. La entrega es manual: el pedido queda registrado y
+              lo activamos a mano, normalmente en pocos minutos en horario de atención.
+              {whatsapp ? " Si algo no cuadra, escríbenos por WhatsApp." : ""}
+            </p>
           )}
+
         </div>
       )}
     </div>

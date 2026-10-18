@@ -368,3 +368,37 @@ export async function catalogStats() {
     lastSync: row?.lastSync ?? null,
   };
 }
+
+/**
+ * Busca productos manuales por su `externalId`, para enlazar una promoción
+ * consultada con el artículo que la vende.
+ *
+ * Las promociones que devuelve SixoFire no son productos de la tienda: son lo
+ * que Garena le ofrece a ESA cuenta. Para que el comprador pueda pagarlas con
+ * su saldo, el dueño crea un artículo manual por cada una siguiendo una
+ * convención de nombres (`manual-levelup-4790`, `manual-oferta-rd-100`) y aquí
+ * se cruzan los dos mundos.
+ *
+ * Solo devuelve los visibles: si el dueño apaga uno, deja de ofrecerse aunque
+ * el jugador lo tenga disponible.
+ */
+export async function findSellableByExternalIds(
+  externalIds: string[],
+): Promise<Map<string, StoreProduct>> {
+  if (externalIds.length === 0) return new Map();
+
+  const config = await getConfig();
+  const rows = await db
+    .select()
+    .from(products)
+    .where(
+      and(
+        eq(products.providerCode, "manual"),
+        eq(products.visible, true),
+        eq(products.active, true),
+        inArray(products.externalId, externalIds),
+      ),
+    );
+
+  return new Map(rows.map((p) => [p.externalId, toStoreProduct(p, config)]));
+}
