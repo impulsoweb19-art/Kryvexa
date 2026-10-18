@@ -38,6 +38,14 @@ const schema = z.object({
   /** Obtenido una vez desde GET /getMe. Firma los webhooks entrantes (HMAC-SHA256). */
   EPINBY_WEBHOOK_SECRET: z.string().default(""),
 
+  /**
+   * SixoFire: consulta de ofertas RD y paquetes de nivel. Vacía = la pantalla
+   * de verificación se muestra apagada en vez de reventar.
+   */
+  SIXOFF_BASE_URL: z.string().url().default("https://api.sixofire.net"),
+  SIXOFF_API_KEY: z.string().default(""),
+  SIXOFF_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+
   PROVIDER_MOCK: bool,
 
   /**

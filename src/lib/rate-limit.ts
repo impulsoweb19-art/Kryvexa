@@ -34,6 +34,13 @@ export const RULES = {
   orderCreate: { action: "order.create", limit: 20, windowSec: 10 * 60 },
   validatePlayer: { action: "player.validate", limit: 30, windowSec: 10 * 60 },
   /**
+   * Consulta de ofertas y paquetes de nivel. Apretado porque CUESTA DINERO:
+   * cada consulta descuenta dos peticiones de la cuota mensual de SixoFire,
+   * incluso cuando el jugador no tiene nada disponible. Quince por hora le
+   * sobran a cualquiera que esté comprando de verdad.
+   */
+  consultaCuenta: { action: "cuenta.consulta", limit: 15, windowSec: 60 * 60 },
+  /**
    * Canje de códigos: apretado a propósito. Alguien podría intentar adivinar
    * códigos ajenos probando combinaciones, y aunque hay 28 millones posibles,
    * no hay razón para dejar que lo intente.

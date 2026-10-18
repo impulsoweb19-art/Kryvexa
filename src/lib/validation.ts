@@ -146,6 +146,14 @@ export const productInputsSchema = z.record(
   cleanString(64).pipe(z.string().min(1, "Campo obligatorio")),
 );
 
+/** UID de Free Fire: solo dígitos y al menos 8, como exige SixoFire. */
+export const consultaCuentaSchema = z.object({
+  uid: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{8,15}$/, "El ID son solo números, mínimo 8 dígitos."),
+});
+
 export const validateAccountSchema = z.object({
   productId: z.string().min(1),
   accountId: cleanString(64).pipe(z.string().min(3, "Ingresa un ID válido")),

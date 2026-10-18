@@ -24,6 +24,7 @@ export interface NavUser {
 const LINKS_PUBLICOS = [{ href: "/top", label: "Top del mes" }];
 
 const LINKS_CON_SESION = [
+  { href: "/promociones", label: "Mis promociones" },
   { href: "/billetera", label: "Billetera" },
   { href: "/pedidos", label: "Mis pedidos" },
   { href: "/cuenta", label: "Mi cuenta" },
