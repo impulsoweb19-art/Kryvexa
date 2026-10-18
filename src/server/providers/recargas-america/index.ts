@@ -166,31 +166,63 @@ class RecargasAmericaService implements ProviderAdapter {
     return mapBuyCatalog(raw);
   }
 
-  // ── GET /orders/{referencia} — conciliación de órdenes PENDING ────────────
+  // ── GET /orders/{id} — conciliación de órdenes PENDING ───────────────────
+  //
+  // El proveedor devuelve DOS identificadores de la misma compra:
+  //
+  //   order_id:       "RAAPI-MP-1006915-1QRB"
+  //   transaction_id: 1006915
+  //
+  // y el número va embebido en la cadena. Preguntábamos con la cadena
+  // completa y respondía 404 "Orden no encontrada" — el motivo por el que los
+  // pedidos diferidos llevaban meses atascados en "En proceso" y el dueño los
+  // marcaba a mano uno por uno.
+  //
+  // Se prueban los dos: primero el número, que es lo que suele esperar un
+  // endpoint así, y si no, la cadena. No se adivina cuál es el bueno: el que
+  // funcione queda en la bitácora y entonces se simplifica.
+
+  /** "RAAPI-MP-1006915-1QRB" → "1006915". Null si no tiene esa forma. */
+  private numeroDeReferencia(reference: string): string | null {
+    return /^RAAPI-[A-Z]+-(\d+)-/i.exec(reference)?.[1] ?? null;
+  }
+
+  private async pedirEstado(id: string, orderId?: string): Promise<OrderStatusResult | "no-existe"> {
+    try {
+      return mapOrder(
+        await request<RawOrder>({
+          operation: "orders.get",
+          method: "GET",
+          path: `/orders/${encodeURIComponent(id)}`,
+          orderId,
+          timeoutMs: 15_000,
+        }),
+      );
+    } catch (e) {
+      if (e instanceof ProviderRequestError && e.httpStatus === 404) return "no-existe";
+      throw e;
+    }
+  }
+
   async getOrderStatus(reference: string, orderId?: string): Promise<OrderStatusResult> {
     if (isMock()) return mapOrder(mock.mockOrderStatus(reference));
 
-    try {
-      const raw = await request<RawOrder>({
-        operation: "orders.get",
-        method: "GET",
-        path: `/orders/${encodeURIComponent(reference)}`,
-        orderId,
-        timeoutMs: 15_000,
-      });
-      return mapOrder(raw);
-    } catch (e) {
-      const err = e as ProviderRequestError;
-      // Mientras no habiliten la consulta para el catálogo unificado, esto
-      // responde 404. "No puedo preguntar" no es "la compra falló": se
-      // devuelve UNKNOWN para que la orden siga pendiente y acabe en revisión
-      // manual, nunca reembolsada a ciegas.
-      if (err instanceof ProviderRequestError && err.httpStatus === 404) {
-        logger.warn("El proveedor aún no permite consultar esta orden", { reference });
-        return { status: "UNKNOWN", reference, transactionId: null, item: null, pins: [], raw: null };
-      }
-      throw e;
+    const numero = this.numeroDeReferencia(reference);
+    const candidatos = numero ? [numero, reference] : [reference];
+
+    for (const id of candidatos) {
+      const r = await this.pedirEstado(id, orderId);
+      if (r !== "no-existe") return r;
     }
+
+    // Ninguno de los dos existe para ellos. "No puedo preguntar" NO es "la
+    // compra falló": se devuelve UNKNOWN para que la orden siga pendiente y
+    // acabe en revisión manual, nunca reembolsada a ciegas.
+    logger.warn("El proveedor no reconoce ninguno de los dos identificadores", {
+      reference,
+      numero,
+    });
+    return { status: "UNKNOWN", reference, transactionId: null, item: null, pins: [], raw: null };
   }
 
   // ── Diagnóstico para el panel admin ───────────────────────────────────────
