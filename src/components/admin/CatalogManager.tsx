@@ -20,6 +20,7 @@ export interface AdminProductRow {
   validationSupported: boolean;
   inputLabels: string[];
   hasImage: boolean;
+  description: string | null;
   imageUrl: string;
 }
 
@@ -59,6 +60,7 @@ export function CatalogManager({
   const [message, setMessage] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [descDrafts, setDescDrafts] = useState<Record<string, string>>({});
   const [imageBusy, setImageBusy] = useState<string | null>(null);
   // Cambia por producto al subir/quitar una imagen, para forzar que el
   // navegador la vuelva a pedir en vez de mostrar la que tenía en caché.
@@ -139,8 +141,10 @@ export function CatalogManager({
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error ?? "No se pudo actualizar.");
       router.refresh();
+      return true;
     } catch (e) {
       setMessage({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
       setBusy(null);
     }
@@ -178,6 +182,33 @@ export function CatalogManager({
       setMessage({ tone: "danger", text: (e as Error).message });
     } finally {
       setImageBusy(null);
+    }
+  }
+
+  /**
+   * La descripción se guarda con botón y no al escribir: es texto largo, y
+   * mandar una petición por tecla pulsada sería absurdo. El borrador vive
+   * aparte para poder comparar y no guardar lo que no cambió.
+   */
+  async function saveDescription(p: AdminProductRow) {
+    const draft = descDrafts[p.id];
+    if (draft === undefined) return;
+    const limpio = draft.trim();
+    if (limpio === (p.description ?? "")) {
+      setMessage({ tone: "ok", text: "La descripción no cambió." });
+      return;
+    }
+
+    // Sin confirmación explícita, guardar un texto largo se siente como que no
+    // pasó nada: la caja se queda igual y no hay forma de saber si quedó.
+    const guardado = await patch(p.id, { description: limpio === "" ? null : limpio });
+    if (guardado) {
+      setMessage({
+        tone: "ok",
+        text: limpio === ""
+          ? `Descripción borrada en ${p.packageName}.`
+          : `Descripción guardada en ${p.packageName}.`,
+      });
     }
   }
 
@@ -384,6 +415,42 @@ export function CatalogManager({
                     />
                     Destacado
                   </label>
+                </div>
+              </div>
+
+              {/*
+                La descripción es lo único que el comprador lee además del
+                nombre y el precio. Importa en lo que no se explica solo: los
+                likes se entregan a 200 por día, y eso tiene que saberlo ANTES
+                de pagar.
+              */}
+              <div className="mt-4 border-t border-line-soft pt-4">
+                <label
+                  htmlFor={`desc-${p.id}`}
+                  className="mb-1.5 block text-xs font-medium text-muted"
+                >
+                  Descripción — la ve el comprador en la tienda y antes de pagar
+                </label>
+                <textarea
+                  id={`desc-${p.id}`}
+                  rows={3}
+                  defaultValue={p.description ?? ""}
+                  placeholder="Vacío: el producto se muestra solo con su nombre."
+                  onChange={(e) => setDescDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                  className="w-full rounded-xl border border-line bg-abyss px-3.5 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-flame-500/70 focus:outline-none focus:ring-2 focus:ring-flame-500/20"
+                />
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="text-xs text-faint">
+                    Deja una línea en blanco entre párrafos; se respetan los saltos.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={busy === p.id}
+                    onClick={() => saveDescription(p)}
+                  >
+                    Guardar descripción
+                  </Button>
                 </div>
               </div>
             </Card>

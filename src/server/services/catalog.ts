@@ -304,7 +304,9 @@ export async function syncCatalog(providerCode?: string): Promise<SyncResult> {
 
 export async function updateProductOverride(
   productId: string,
-  patch: Partial<Pick<Product, "visible" | "featured" | "sortOrder" | "priceCents" | "marginBps">>,
+  patch: Partial<
+    Pick<Product, "visible" | "featured" | "sortOrder" | "priceCents" | "marginBps" | "description">
+  >,
 ) {
   const [updated] = await db
     .update(products)

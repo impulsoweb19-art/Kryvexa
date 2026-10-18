@@ -187,6 +187,11 @@ export const productOverrideSchema = z.object({
   sortOrder: z.number().int().min(0).max(9999).optional(),
   priceCents: z.number().int().positive().nullable().optional(),
   marginBps: z.number().int().min(0).max(20_000).nullable().optional(),
+  /**
+   * Texto que ve el comprador en la tienda y antes de pagar. Vacío = se borra,
+   * y entonces el producto vuelve a mostrarse solo con su nombre.
+   */
+  description: z.string().max(1500).nullable().optional(),
 });
 
 /**

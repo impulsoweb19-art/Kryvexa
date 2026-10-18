@@ -31,6 +31,7 @@ export default async function AdminCatalogPage() {
     validationSupported: p.validationSupported,
     inputLabels: ((p.inputFields as ProviderInputField[]) ?? []).map((f) => f.label),
     hasImage: Boolean(p.imagePath),
+    description: p.description,
     imageUrl: productImageUrl(p),
   }));
 
