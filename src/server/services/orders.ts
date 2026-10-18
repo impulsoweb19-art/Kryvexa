@@ -7,6 +7,8 @@ import { AppError } from "@/lib/errors";
 import { humanCode } from "@/lib/ids";
 import { logger } from "@/lib/logger";
 import { applyTransaction, ensureWallet } from "./wallet";
+import { after } from "next/server";
+
 import { sendManualOrderNotification } from "@/lib/whatsapp";
 import { esPromocionDeCuenta, getPurchasableProduct, sellPriceCents } from "./catalog";
 import { asegurarPromocionDisponible } from "./sixoff";
@@ -112,6 +114,27 @@ function describeInputs(product: Product, inputs: Record<string, string>): strin
   return parts.length > 0 ? parts.join(", ") : "—";
 }
 
+/**
+ * Manda el aviso DESPUÉS de responderle al comprador, pero garantizando que se
+ * manda.
+ *
+ * Antes iba con `void`, para no hacerle esperar a Twilio. El problema es que
+ * en Vercel la función se congela en cuanto se envía la respuesta: si la
+ * llamada no había terminado, se cortaba a medias. De ahí que unos pedidos
+ * avisaran y otros no, sin patrón aparente — dependía de quién ganara la
+ * carrera. El pedido nunca se perdió, solo el aviso.
+ *
+ * `after` le dice a la plataforma que no apague la función todavía. Fuera de
+ * una petición (un cron, un script) no existe, y ahí se vuelve al envío suelto.
+ */
+function notificarTrasResponder(fn: () => Promise<void>) {
+  try {
+    after(fn);
+  } catch {
+    void fn();
+  }
+}
+
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const { product, config } = await getPurchasableProduct(input.productId);
 
@@ -209,13 +232,15 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   // que el dueño la entregue a mano: es el único caso donde tiene sentido
   // avisarle por WhatsApp (los demás proveedores se resuelven solos).
   if (finalOrder.providerCode === "manual" && finalOrder.status === "PENDING") {
-    void sendManualOrderNotification({
-      code: finalOrder.code,
-      productLabel: `${finalOrder.gameName} — ${finalOrder.productName}`,
-      priceCents: finalOrder.priceCents,
-      customerLabel: input.user.name || input.user.email,
-      detailsLabel: describeInputs(product, input.inputs),
-    });
+    notificarTrasResponder(() =>
+      sendManualOrderNotification({
+        code: finalOrder.code,
+        productLabel: `${finalOrder.gameName} — ${finalOrder.productName}`,
+        priceCents: finalOrder.priceCents,
+        customerLabel: input.user.name || input.user.email,
+        detailsLabel: describeInputs(product, input.inputs),
+      }),
+    );
   }
 
   return { order: finalOrder, duplicated: false };
