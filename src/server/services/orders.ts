@@ -11,7 +11,7 @@ import { after } from "next/server";
 
 import { sendManualOrderNotification } from "@/lib/whatsapp";
 import { esPromocionDeCuenta, getPurchasableProduct, sellPriceCents } from "./catalog";
-import { asegurarPromocionDisponible } from "./sixoff";
+import { asegurarPromocionDisponible, olvidarCuenta } from "./sixoff";
 import {
   asegurarProveedorDisponible,
   esCaidaDelProveedor,
@@ -153,6 +153,31 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     entregarlo. Se comprueba contra el proveedor antes de cobrar.
   */
   if (esPromocionDeCuenta(product)) {
+    /*
+      La entrega es manual, así que entre la compra y la entrega Garena sigue
+      ofreciendo el paquete: sin esto, el mismo jugador podría comprarlo dos
+      veces y el dueño solo podría entregárselo una.
+    */
+    const [yaPedido] = await db
+      .select({ code: orders.code })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.productId, product.id),
+          inArray(orders.status, ["PENDING", "NEEDS_REVIEW", "PROCESSING"]),
+          sql`${orders.inputs}->>'input1' = ${input.inputs.input1 ?? ""}`,
+        ),
+      )
+      .limit(1);
+
+    if (yaPedido) {
+      throw new AppError("CONFLICT", {
+        userMessage:
+          `Ya tienes esta promoción pedida (${yaPedido.code}) y está pendiente de entrega. ` +
+          "Espera a que la activemos antes de volver a comprarla.",
+      });
+    }
+
     await asegurarPromocionDisponible(product.externalId, input.inputs.input1);
   }
 
@@ -527,6 +552,16 @@ export async function adminResolveOrder(
     failureMessage: note ?? null,
     completedAt: resolution === "COMPLETED" ? new Date() : order.completedAt,
   });
+
+  /*
+    Entregado un paquete de promoción, Garena deja de ofrecérselo a esa cuenta.
+    Sin esto el jugador lo seguiría viendo disponible hasta media hora después
+    —el tiempo que guardamos la consulta— y podría intentar comprarlo otra vez.
+  */
+  if (esPromocionDeCuenta(order)) {
+    const uid = (order.inputs as Record<string, string>)?.input1;
+    if (uid) olvidarCuenta(uid);
+  }
 
   await recordAudit({
     actorId: admin.id,

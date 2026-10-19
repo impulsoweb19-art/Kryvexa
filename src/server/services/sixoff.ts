@@ -1,6 +1,6 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 
 import { env } from "@/lib/env";
 import { AppError } from "@/lib/errors";
@@ -30,6 +30,26 @@ import { logger } from "@/lib/logger";
 
 /** Lo que un jugador tiene disponible cambia despacio. */
 const CACHE_SEGUNDOS = 1800;
+
+/** Etiqueta propia de cada jugador, para poder tirar SU caché sin tocar la de los demás. */
+const etiquetaDe = (uid: string) => `sixoff:${uid}`;
+
+/**
+ * Olvida lo que sabíamos de este jugador.
+ *
+ * Se llama cuando el dueño marca entregado un paquete de promoción: en ese
+ * momento Garena deja de ofrecérselo, y si no se tira la caché el jugador lo
+ * seguiría viendo disponible media hora más. Es por jugador y no global, para
+ * no obligar a reconsultar —y pagar— las cuentas de todos los demás.
+ */
+export function olvidarCuenta(uid: string) {
+  try {
+    revalidateTag(etiquetaDe(uid));
+  } catch {
+    // Fuera de una petición no hay caché que invalidar; la siguiente consulta
+    // la refrescará igual cuando caduquen los 30 minutos.
+  }
+}
 
 export interface PaqueteNivel {
   itemId: string;
@@ -160,7 +180,7 @@ async function consultarNivelSinCache(uid: string): Promise<CuentaConsultada> {
 export function consultarNivel(uid: string): Promise<CuentaConsultada> {
   return unstable_cache(() => consultarNivelSinCache(uid), ["sixoff-nivel", uid], {
     revalidate: CACHE_SEGUNDOS,
-    tags: ["sixoff"],
+    tags: ["sixoff", etiquetaDe(uid)],
   })();
 }
 
@@ -220,7 +240,7 @@ async function consultarOfertasSinCache(uid: string): Promise<{
 function consultarOfertas(uid: string) {
   return unstable_cache(() => consultarOfertasSinCache(uid), ["sixoff-ofertas", uid], {
     revalidate: CACHE_SEGUNDOS,
-    tags: ["sixoff"],
+    tags: ["sixoff", etiquetaDe(uid)],
   })();
 }
 
