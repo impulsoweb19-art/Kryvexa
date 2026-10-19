@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, count, desc, eq, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, products, users, type Order, type OrderStatus, type Product } from "@/db/schema";
 import { AppError } from "@/lib/errors";
@@ -154,17 +154,27 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   */
   if (esPromocionDeCuenta(product)) {
     /*
-      La entrega es manual, así que entre la compra y la entrega Garena sigue
-      ofreciendo el paquete: sin esto, el mismo jugador podría comprarlo dos
-      veces y el dueño solo podría entregárselo una.
+      Una promoción por cuenta, y lo decide NUESTRO registro.
+
+      No basta con preguntarle al proveedor. Los descuentos RD desaparecen de su
+      API en cuanto se usan, pero los paquetes de nivel siguen figurando como
+      disponibles un buen rato después de entregados — lo comprobó el dueño el
+      18/10/2026, cuando un cliente le compró dos veces el mismo paquete de
+      nivel 30 y él solo pudo entregarle uno.
+
+      Tampoco vale mirar solo los pedidos pendientes: al marcar el primero como
+      entregado se liberaría el bloqueo y podrían comprarlo otra vez mientras
+      Garena siga mostrándolo. Cuentan todos los pedidos de esa promoción para
+      ese jugador, salvo los devueltos — esos no se entregaron, así que no
+      consumieron nada.
     */
     const [yaPedido] = await db
-      .select({ code: orders.code })
+      .select({ code: orders.code, status: orders.status })
       .from(orders)
       .where(
         and(
           eq(orders.productId, product.id),
-          inArray(orders.status, ["PENDING", "NEEDS_REVIEW", "PROCESSING"]),
+          ne(orders.status, "REFUNDED"),
           sql`${orders.inputs}->>'input1' = ${input.inputs.input1 ?? ""}`,
         ),
       )
@@ -173,8 +183,11 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     if (yaPedido) {
       throw new AppError("CONFLICT", {
         userMessage:
-          `Ya tienes esta promoción pedida (${yaPedido.code}) y está pendiente de entrega. ` +
-          "Espera a que la activemos antes de volver a comprarla.",
+          yaPedido.status === "COMPLETED"
+            ? `Esta promoción ya se activó en tu cuenta (pedido ${yaPedido.code}). ` +
+              "Si crees que es un error, escríbenos."
+            : `Ya tienes esta promoción pedida (${yaPedido.code}) y está pendiente de entrega. ` +
+              "Espera a que la activemos antes de volver a comprarla.",
       });
     }
 
