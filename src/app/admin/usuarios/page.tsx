@@ -71,7 +71,7 @@ export default async function AdminUsersPage({
                   >
                     Ver pedidos
                   </Link>
-                  {u.role !== "ADMIN" && <UserActions userId={u.id} status={u.status} />}
+                  {u.role !== "ADMIN" && <UserActions userId={u.id} status={u.status} email={u.email} />}
                 </div>
               </li>
             ))}

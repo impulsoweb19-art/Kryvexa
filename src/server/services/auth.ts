@@ -276,3 +276,68 @@ export async function setUserStatus(admin: SessionUser, userId: string, status: 
 
   return updated;
 }
+
+/**
+ * Corrige el correo de una cuenta desde el panel.
+ *
+ * ── POR QUÉ EXISTE ──────────────────────────────────────────────────────────
+ * Quien se registra con el correo mal escrito —"@gail.com", "@gma.com"— queda
+ * incomunicado: no recibe el código para recuperar su contraseña, y tampoco
+ * puede cambiarlo él, porque para entrar a su cuenta necesitaría justamente
+ * ese código. Sin esto, esa cuenta y su saldo quedan perdidos para siempre.
+ *
+ * El 22/10/2026 había dos casos así entre los compradores de la tienda.
+ *
+ * ── LO QUE NO HACE ──────────────────────────────────────────────────────────
+ * No cierra las sesiones de esa persona. Corregirle una errata no es motivo
+ * para echarla de su propia cuenta si está dentro comprando.
+ *
+ * Queda en la bitácora con el correo viejo y el nuevo: cambiar el correo de
+ * una cuenta es, en el fondo, poder tomarla —quien lo cambia puede luego pedir
+ * el código de recuperación a su propia dirección—. Que sea una acción
+ * rastreable es lo que lo hace aceptable.
+ */
+export async function setUserEmail(admin: SessionUser, userId: string, email: string) {
+  const normalized = email.toLowerCase().trim();
+
+  const [actual] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!actual) throw new AppError("NOT_FOUND");
+
+  if (actual.email.toLowerCase() === normalized) {
+    throw new AppError("CONFLICT", { userMessage: "Ese ya es el correo de la cuenta." });
+  }
+
+  // El índice único lo impediría igual, pero un error de base de datos no le
+  // dice a nadie qué pasó.
+  const [ocupado] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${normalized}`)
+    .limit(1);
+  if (ocupado) {
+    throw new AppError("CONFLICT", {
+      userMessage: "Ya existe otra cuenta con ese correo.",
+    });
+  }
+
+  const [updated] = await db
+    .update(users)
+    .set({ email: normalized, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+
+  await recordAudit({
+    actorId: admin.id,
+    actorEmail: admin.email,
+    action: "user.email.change",
+    entityType: "user",
+    entityId: userId,
+    meta: { anterior: actual.email, nuevo: normalized },
+  });
+
+  return updated;
+}
