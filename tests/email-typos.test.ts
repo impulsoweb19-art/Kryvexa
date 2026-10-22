@@ -17,6 +17,9 @@ describe("sugerirCorreo", () => {
       ["ana@hotmai.com", "ana@hotmail.com"],
       ["ana@outlok.com", "ana@outlook.com"],
       ["ana@yaho.com", "ana@yahoo.com"],
+      // Las dos que bloquearon a compradores reales de Kryvexa.
+      ["juniorcreeenelcahuide2@gail.com", "juniorcreeenelcahuide2@gmail.com"],
+      ["filimonlujangutierrez@gma.com", "filimonlujangutierrez@gmail.com"],
     ];
     for (const [entrada, esperado] of casos) {
       assert.equal(sugerirCorreo(entrada), esperado, entrada);

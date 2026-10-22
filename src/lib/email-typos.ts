@@ -21,27 +21,32 @@
  * parecen peligrosamente a ellos y son reales: "ymail.com" y "mail.com" están
  * a una sola letra de "gmail.com", y sin esta lista se los corregiría mal.
  */
-const DOMINIOS_CONOCIDOS = new Set([
+const DOMINIOS_CONOCIDOS = [
+  // Primero los que de verdad usa la gente en Perú. El ORDEN IMPORTA: cuando
+  // una errata puede corregirse a dos dominios distintos, gana el de más
+  // arriba, no el que esté a menos letras.
   "gmail.com",
-  "googlemail.com",
   "hotmail.com",
-  "hotmail.es",
-  "hotmail.com.pe",
   "outlook.com",
-  "outlook.es",
-  "outlook.com.pe",
-  "live.com",
-  "live.com.mx",
-  "msn.com",
   "yahoo.com",
+  "icloud.com",
+  "hotmail.es",
+  "outlook.es",
+  "live.com",
+  "hotmail.com.pe",
+  "outlook.com.pe",
   "yahoo.es",
   "yahoo.com.mx",
-  "ymail.com",
-  "rocketmail.com",
-  "icloud.com",
+  "live.com.mx",
+  "googlemail.com",
+  "msn.com",
   "me.com",
   "mac.com",
   "aol.com",
+  // De aquí para abajo, dominios reales que se parecen peligrosamente a los de
+  // arriba. Están para NO corregirlos cuando alguien los escribe bien.
+  "ymail.com",
+  "rocketmail.com",
   "mail.com",
   "email.com",
   "gmx.com",
@@ -49,16 +54,24 @@ const DOMINIOS_CONOCIDOS = new Set([
   "proton.me",
   "protonmail.com",
   "pm.me",
-]);
+] as const;
+
+const CONOCIDOS = new Set<string>(DOMINIOS_CONOCIDOS);
 
 /** Máxima diferencia tolerada para proponer un cambio. */
 const MAX_DISTANCIA = 2;
 
 /**
- * Un dominio corto se parece a demasiadas cosas ("live.com" y "mail.com"
- * distan 2). A partir de aquí se exige una diferencia de una sola letra.
+ * Por debajo de este largo se exige una diferencia de UNA sola letra, porque
+ * un dominio corto se parece a demasiadas cosas.
+ *
+ * Estuvo en 9 y era pasarse de prudente: dejaba fuera "gma.com" (7 letras, dos
+ * de diferencia con gmail.com), que es justo una de las erratas que acabó
+ * bloqueando a un comprador real. Los dominios cortos que de verdad existen
+ * —gmx, aol, mac, me, mail— ya están en la lista de arriba y nunca llegan
+ * hasta aquí.
  */
-const LARGO_SEGURO = 9;
+const LARGO_SEGURO = 7;
 
 /**
  * Distancia de edición con corte temprano: en cuanto toda una fila supera el
@@ -110,21 +123,29 @@ export function sugerirCorreo(email: string): string | null {
   // Sin punto aún no es un dominio; avisar aquí sería interrumpir a alguien
   // que va por la mitad.
   if (!dominio.includes(".")) return null;
-  if (DOMINIOS_CONOCIDOS.has(dominio)) return null;
+  if (CONOCIDOS.has(dominio)) return null;
 
-  let mejor: string | null = null;
-  let mejorDistancia = MAX_DISTANCIA + 1;
+  /*
+    Se elige por POPULARIDAD, no por cercanía, y la distancia solo desempata.
 
+    "gma.com" está a una letra de "gmx.com" —un proveedor alemán real— y a dos
+    de "gmail.com". Eligiendo el más cercano se le proponía gmx a un comprador
+    peruano que obviamente quiso escribir gmail, y la sugerencia no servía de
+    nada. Pasó de verdad: esa dirección acabó rebotando y bloqueó la cuenta.
+  */
   for (const candidato of DOMINIOS_CONOCIDOS) {
     const d = distancia(dominio, candidato, MAX_DISTANCIA);
-    if (d < mejorDistancia) {
-      mejorDistancia = d;
-      mejor = candidato;
-    }
+    if (d > MAX_DISTANCIA) continue;
+
+    // Un dominio corto se parece a demasiadas cosas: ahí se exige una sola
+    // letra de diferencia.
+    if (dominio.length < LARGO_SEGURO && d > 1) continue;
+
+    // El primero que encaja gana, y punto. No se sigue buscando uno más
+    // cercano: la lista está ordenada por cuánto se usa, y eso pesa más que
+    // una letra de diferencia.
+    return `${local}@${candidato}`;
   }
 
-  if (!mejor || mejorDistancia > MAX_DISTANCIA) return null;
-  if (dominio.length < LARGO_SEGURO && mejorDistancia > 1) return null;
-
-  return `${local}@${mejor}`;
+  return null;
 }
