@@ -62,6 +62,8 @@ export default async function AdminSettingsPage() {
           marginBps: config.marginBps,
           minDepositCents: config.minDepositCents,
           purchasesEnabled: config.purchasesEnabled,
+          storeNoticeEnabled: config.storeNoticeEnabled,
+          storeNoticeText: config.storeNoticeText,
         }}
       />
     </div>

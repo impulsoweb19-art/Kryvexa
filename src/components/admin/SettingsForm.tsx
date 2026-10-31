@@ -19,6 +19,8 @@ export interface SettingsValues {
   marginBps: number;
   minDepositCents: number;
   purchasesEnabled: boolean;
+  storeNoticeEnabled: boolean;
+  storeNoticeText: string;
 }
 
 export function SettingsForm({ initial }: { initial: SettingsValues }) {
@@ -28,6 +30,42 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
   const [loading, setLoading] = useState(false);
   const [purchasesEnabled, setPurchasesEnabled] = useState(initial.purchasesEnabled);
   const [cambiandoCompras, setCambiandoCompras] = useState(false);
+  const [avisoActivo, setAvisoActivo] = useState(initial.storeNoticeEnabled);
+  const [avisoTexto, setAvisoTexto] = useState(initial.storeNoticeText);
+  const [guardandoAviso, setGuardandoAviso] = useState(false);
+
+  /**
+   * El cartel se guarda solo, igual que el corte de compras y por la misma
+   * razón: se usa con prisa, cuando el proveedor se quedó sin stock y hay
+   * clientes entrando. Depender de bajar al final de la pantalla y pulsar
+   * "Guardar" es cómo se pierde un aviso que ya habías escrito.
+   */
+  async function guardarAviso(enabled: boolean, text: string) {
+    setGuardandoAviso(true);
+    setMessage(null);
+    const antes = avisoActivo;
+    setAvisoActivo(enabled);
+    try {
+      const res = await fetch("/api/admin/settings/aviso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled, text }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) throw new Error(json?.error ?? "No se pudo guardar el aviso.");
+      setMessage({
+        tone: "ok",
+        text: enabled ? "Cartel encendido. Ya lo ven tus clientes." : "Cartel apagado.",
+      });
+      router.refresh();
+    } catch (err) {
+      setAvisoActivo(antes);
+      setMessage({ tone: "danger", text: (err as Error).message });
+    } finally {
+      setGuardandoAviso(false);
+    }
+  }
+
 
   /**
    * El interruptor de compras se guarda SOLO, sin pulsar "Guardar".
@@ -85,9 +123,12 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
       exchangeRate: Number(form.get("exchangeRate")),
       marginBps: Math.round(Number(form.get("marginPercent")) * 100),
       minDepositCents: Math.round(Number(form.get("minDeposit")) * 100),
-      // Se envía el valor actual porque el esquema lo exige, pero quien manda
-      // de verdad es el interruptor de arriba, que guarda al instante.
+      // Se envían los valores actuales porque el esquema los exige, pero quien
+      // manda de verdad son los interruptores de arriba, que guardan al
+      // instante.
       purchasesEnabled,
+      storeNoticeEnabled: avisoActivo,
+      storeNoticeText: avisoTexto,
     });
 
     if (!parsed.success) {
@@ -202,6 +243,58 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
             </span>
           </span>
         </label>
+
+        {/*
+          El cartel vive al lado del corte de compras a propósito: son las dos
+          cosas que se tocan el mismo día, cuando el proveedor se cae. Apagar
+          las compras sin avisar deja al comprador descubriéndolo al confirmar,
+          que es justo lo que se siente como una página rota.
+        */}
+        <div
+          className={`space-y-3 rounded-xl border p-4 ${
+            avisoActivo ? "border-warn/50 bg-warn/10" : "border-line bg-abyss"
+          }`}
+        >
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={avisoActivo}
+              disabled={guardandoAviso}
+              onChange={(e) => guardarAviso(e.target.checked, avisoTexto)}
+              className="size-4 accent-flame-500"
+            />
+            <span className="text-sm">
+              <strong className="block">
+                {avisoActivo ? "CARTEL ENCENDIDO" : "Cartel en la tienda"}
+              </strong>
+              <span className={avisoActivo ? "text-warn" : "text-muted"}>
+                {avisoActivo
+                  ? "Tus clientes lo están viendo en todas las pantallas."
+                  : "Un aviso arriba de toda la tienda. Se guarda solo, sin pulsar Guardar."}
+              </span>
+            </span>
+          </label>
+
+          <textarea
+            rows={2}
+            maxLength={300}
+            value={avisoTexto}
+            onChange={(e) => setAvisoTexto(e.target.value)}
+            placeholder="Sin stock por problemas del proveedor. Volvemos mañana."
+            className="w-full rounded-xl border border-line bg-abyss px-3.5 py-2.5 text-sm text-ink placeholder:text-faint focus:border-flame-500/70 focus:outline-none focus:ring-2 focus:ring-flame-500/20"
+          />
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-faint">{avisoTexto.length}/300</span>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={guardandoAviso}
+              onClick={() => guardarAviso(avisoActivo, avisoTexto)}
+            >
+              Guardar texto
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <Card className="space-y-4">

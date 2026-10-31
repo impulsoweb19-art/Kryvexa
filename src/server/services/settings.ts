@@ -40,6 +40,13 @@ export interface StoreConfig {
   minDepositCents: number;
   /** Interruptor de emergencia: corta las compras sin apagar el sitio. */
   purchasesEnabled: boolean;
+  /**
+   * Cartel en toda la tienda. Es lo que faltaba cuando no hay stock: hasta
+   * ahora el comprador entraba, elegía paquete, y recién al confirmar
+   * descubría que no se podía. Eso se siente roto; un aviso arriba no.
+   */
+  storeNoticeEnabled: boolean;
+  storeNoticeText: string;
   /** Avisar en el panel si el saldo del revendedor baja de aquí (USD, céntimos). */
   providerLowBalanceUsdCents: number;
 }
@@ -60,6 +67,8 @@ export const DEFAULT_CONFIG: StoreConfig = {
   marginBps: 2500,
   minDepositCents: 500,
   purchasesEnabled: true,
+  storeNoticeEnabled: false,
+  storeNoticeText: "",
   providerLowBalanceUsdCents: 2000,
 };
 
@@ -157,6 +166,8 @@ export function publicConfig(c: StoreConfig) {
     socialInstagram: c.socialInstagram,
     minDepositCents: c.minDepositCents,
     purchasesEnabled: c.purchasesEnabled,
+    storeNoticeEnabled: c.storeNoticeEnabled,
+    storeNoticeText: c.storeNoticeText,
   };
 }
 

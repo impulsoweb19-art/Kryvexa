@@ -186,6 +186,8 @@ export const settingsSchema = z.object({
   marginBps: z.number().int().min(0).max(20_000),
   minDepositCents: z.number().int().min(100),
   purchasesEnabled: z.boolean(),
+  storeNoticeEnabled: z.boolean(),
+  storeNoticeText: cleanString(300).optional(),
 });
 
 export const productOverrideSchema = z.object({
