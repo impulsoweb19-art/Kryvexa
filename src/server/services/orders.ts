@@ -53,7 +53,40 @@ import type { SessionUser } from "@/lib/session";
  *      una. "El proveedor dijo que falló" no prueba que no gastara nada.
  */
 
-const MAX_RECONCILE_ATTEMPTS = 12; // ≈ 1 h con el cron cada 5 minutos
+/**
+ * Cuánto se le da a cada proveedor antes de mandar la orden a revisión manual.
+ *
+ * ── POR QUÉ UN PLAZO Y NO UN NÚMERO DE INTENTOS ─────────────────────────────
+ * Antes esto era `MAX_RECONCILE_ATTEMPTS = 12`, "≈ 1 h con el cron cada 5
+ * minutos". Esa equivalencia nunca fue cierta del todo: el cron solo corre de
+ * 8 de la mañana a medianoche (ver `vercel.json`), así que una orden de las
+ * 23:50 no acumulaba su intento número 12 hasta bien entrada la mañana
+ * siguiente. Contar intentos mide la actividad del cron, no el tiempo que el
+ * comprador lleva esperando, que es lo que de verdad importa.
+ *
+ * ── POR QUÉ SIXOFIRE NECESITA TANTO ─────────────────────────────────────────
+ * Su tienda tiene un estado `WAITING_STOCK`: cuando se les acaba el stock de
+ * regalos, el pedido queda EN COLA hasta que repongan. El dueño lo describió
+ * el 14/11/2026 con sus propias entregas: "a veces son al instante, a veces
+ * demoran más de 24h, pero nunca han pasado de 48h". Con el plazo de una hora,
+ * cada pedido suyo habría acabado en revisión manual estando perfectamente
+ * bien, y el dueño habría tenido que revisar a mano justo lo que vino a
+ * automatizar.
+ *
+ * Se dejan 50 y no 48 para no pelearse con el límite por unos minutos.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
+const HORAS_ANTES_DE_REVISAR: Record<string, number> = {
+  sixoff: 50,
+};
+
+/** El resto de proveedores entrega al instante o falla; una hora les sobra. */
+const HORAS_POR_DEFECTO = 1;
+
+function yaEsperoDemasiado(order: { providerCode: string; createdAt: Date }): boolean {
+  const horas = HORAS_ANTES_DE_REVISAR[order.providerCode] ?? HORAS_POR_DEFECTO;
+  return Date.now() - order.createdAt.getTime() >= horas * 3_600_000;
+}
 
 export interface CreateOrderInput {
   user: SessionUser;
@@ -148,7 +181,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   /*
     Las promociones de cuenta se retiraron el 14/11/2026 a petición del dueño:
     llevaban semanas sin funcionar porque SixoFire no consigue abrir sesión
-    contra Garena para leerlas (ver `services/sixoff.ts`).
+    contra Garena para leerlas. Es un problema suyo y no se arregla desde aquí.
 
     Los artículos NO se borran —hay pedidos antiguos que los referencian y el
     historial debe seguir cuadrando—, pero tampoco se pueden comprar. Ya no se
@@ -435,9 +468,9 @@ export async function applyProviderStatus(
 /**
  * Conciliación de órdenes PENDING (la ejecuta el cron).
  *
- * Consulta GET /orders/{reference} y cierra lo que ya tenga veredicto. Tras
- * MAX_RECONCILE_ATTEMPTS sin respuesta clara, la orden pasa a NEEDS_REVIEW:
- * la decide una persona, no una heurística.
+ * Consulta el estado en el proveedor y cierra lo que ya tenga veredicto.
+ * Pasado el plazo de ESE proveedor sin respuesta clara, la orden va a
+ * NEEDS_REVIEW: la decide una persona, no una heurística.
  */
 export async function reconcilePendingOrders(limit = 25) {
   const pending = await db
@@ -461,7 +494,7 @@ export async function reconcilePendingOrders(limit = 25) {
 
     // Sin `reference` no hay nada que consultar: solo puede resolverlo una persona.
     if (!order.providerReference) {
-      if (attempts >= MAX_RECONCILE_ATTEMPTS) {
+      if (yaEsperoDemasiado(order)) {
         await updateOrder(order.id, { status: "NEEDS_REVIEW", attempts, lastCheckedAt: new Date() });
         summary.needsReview += 1;
       } else {
@@ -494,7 +527,7 @@ export async function reconcilePendingOrders(limit = 25) {
           lastCheckedAt: new Date(),
         });
         summary.needsReview += 1;
-      } else if (attempts >= MAX_RECONCILE_ATTEMPTS) {
+      } else if (yaEsperoDemasiado(order)) {
         await updateOrder(order.id, { status: "NEEDS_REVIEW", attempts, lastCheckedAt: new Date() });
         summary.needsReview += 1;
       } else {

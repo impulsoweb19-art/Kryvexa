@@ -41,6 +41,12 @@ export const RULES = {
    */
   consultaCuenta: { action: "cuenta.consulta", limit: 15, windowSec: 60 * 60 },
   /**
+   * Avisos de SixoFire. Cada uno nos hace salir a preguntarles el estado del
+   * pedido, así que sin tope alguien podría usar la ruta para que gastemos
+   * conexiones por él. 120 por minuto le sobran a cualquier ráfaga real.
+   */
+  webhookSixoff: { action: "webhook.sixoff", limit: 120, windowSec: 60 },
+  /**
    * Canje de códigos: apretado a propósito. Alguien podría intentar adivinar
    * códigos ajenos probando combinaciones, y aunque hay 28 millones posibles,
    * no hay razón para dejar que lo intente.
