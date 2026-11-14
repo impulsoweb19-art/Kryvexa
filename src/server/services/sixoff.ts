@@ -10,6 +10,22 @@ import { logger } from "@/lib/logger";
  * Consulta a SixoFire: qué paquetes de nivel y qué ofertas tiene una cuenta
  * de Free Fire.
  *
+ * ── ESTE MÓDULO NO LO LLAMA NADIE (14/11/2026) ──────────────────────────────
+ * El dueño mandó retirar las promociones de cuenta porque llevaban semanas sin
+ * funcionar, y la causa está confirmada: SixoFire no consigue abrir sesión
+ * contra Garena, y sus endpoints de promociones responden una frase de error
+ * en vez de un código. No es nuestro, y no se arregla desde aquí.
+ *
+ * Se conserva —en vez de borrarlo— porque el dueño quiere entrega automática
+ * de pases y fragmentos Evo a través de la TIENDA de SixoFire, que es otra
+ * parte de su API y sí funciona. Ese trabajo reutiliza lo único que aquí
+ * quedó probado contra la API real: `pedir`, `traducirFallo` con sus códigos
+ * verificados, y `/account/info`, que responde bien incluso cuando las
+ * promociones no y es lo que valida el ID del jugador.
+ *
+ * Si ese trabajo no se hace, este archivo se borra entero en un commit.
+ * ────────────────────────────────────────────────────────────────────────────
+ *
  * ── QUÉ ES Y QUÉ NO ES ──────────────────────────────────────────────────────
  * Esto SOLO consulta. SixoFire no vende paquetes de nivel —los quitó de su
  * tienda cuando su proveedor dejó de abastecerle— así que la entrega la hace
@@ -88,7 +104,46 @@ interface Sobre<T> {
  * rastro en el log para que el dueño se entere antes que sus clientes.
  */
 function traducirFallo(httpStatus: number, codigo: string | undefined): AppError {
+  /*
+    Esto va ANTES del switch porque SixoFire no siempre manda un código. Para
+    el fallo más frecuente de todos manda una frase entera en inglés metida en
+    el campo `error`:
+
+      "UID not found or failed to generate valid session after multiple attempts"
+
+    Ningún `case` puede casar eso, así que hasta el 3/11/2026 todos estos
+    fallos acababan en la rama por defecto y el comprador leía "revisa el ID".
+
+    El "UID not found" del principio es ruido suyo, y se comprobó: la cuenta
+    2556383367 devuelve ese error en promociones mientras su propio
+    /account/info la da por buena —nivel 81, región SAC, con nickname—. Lo que
+    falla es la sesión que ELLOS abren contra Garena para leer las
+    promociones, no el ID que escribió el comprador. Echarle la culpa a él es
+    mandarlo a corregir algo que está bien.
+  */
+  if (codigo && /failed to generate valid session/i.test(codigo)) {
+    return new AppError("PROVIDER_NOT_CONFIGURED", {
+      userMessage:
+        "No pudimos consultar las promociones de esa cuenta. Comprueba que el ID sea " +
+        "correcto; si lo es, el servicio está saturado e inténtalo en unos minutos.",
+    });
+  }
+
   switch (codigo) {
+    /*
+      OJO con FST_ERR_VALIDATION: no significa "UID inválido". Es el error
+      genérico de validación de esquema de Fastify, y el 2/11/2026 se
+      comprobó que lo devuelven también cuando falta una cabecera:
+
+        {"status":false,"code":400,"error":"FST_ERR_VALIDATION",
+         "message":"headers must have required property 'x-api-key'","data":null}
+
+      Se deja aquí porque, con la petición bien formada, lo único que puede
+      fallar la validación es el uid. Pero si este caso llegara a saltar por
+      otra cosa, le estaríamos echando la culpa al comprador por un fallo
+      nuestro — y por eso `pedir` registra `message`, que es lo que distingue
+      un uid malo de una cabecera que no llegó.
+    */
     case "INVALID_UID":
     case "FST_ERR_VALIDATION":
       return new AppError("VALIDATION_ERROR", {
@@ -108,12 +163,55 @@ function traducirFallo(httpStatus: number, codigo: string | undefined): AppError
         userMessage: "La consulta no está disponible ahora mismo. Inténtalo más tarde.",
       });
 
+    /*
+      No es NUESTRO límite de 60/min: su mensaje es "Garena API rate limit
+      reached.", o sea que el que les está frenando es Garena. No lo arregla
+      ni el dueño ni el comprador, solo se pasa con el tiempo.
+
+      Se registra como aviso y no como error porque no hay nada roto: es la
+      cola de un servicio compartido.
+    */
+    /*
+      La ÚNICA respuesta suya que significa de verdad "ese ID no existe", y
+      solo la devuelve /account/info (404). Las promociones nunca la mandan:
+      ahí todo llega mezclado en la frase de la sesión. Es la pieza que
+      permite acusar al comprador de equivocarse sólo cuando se equivocó.
+    */
+    case "ACCOUNT_NOT_FOUND":
+      return new AppError("INVALID_PLAYER_ID", {
+        userMessage:
+          "No encontramos ninguna cuenta de Free Fire con ese ID. Revísalo y vuelve a intentarlo.",
+      });
+
+    case "RATE_LIMIT_EXCEEDED":
+      logger.warn("Garena está limitando las consultas de SixoFire", { httpStatus });
+      return new AppError("PROVIDER_NOT_CONFIGURED", {
+        userMessage:
+          "Hay mucha demanda de consultas en este momento. Espera unos minutos y " +
+          "vuelve a intentarlo; tu ID está bien.",
+      });
+
+    /*
+      Aquí cae TODO lo que no reconocemos, y por eso el mensaje ya no afirma
+      que el ID esté mal.
+
+      Decía "Revisa el ID e inténtalo de nuevo" para cualquier fallo por
+      debajo de 500, viniera de donde viniera. El dueño reportó el 2/11/2026
+      que a unas cuentas "no les deja revisar el ID y otras sí con
+      normalidad": el comprador leía que su ID estaba mal, lo volvía a
+      escribir igual de bien, y volvía a fallar. Mandar a alguien a arreglar
+      algo que no está roto es peor que admitir que no sabemos.
+
+      Quién tiene de verdad la culpa lo dirá el log de `pedir`, que ahora
+      guarda el código tal cual lo manda SixoFire.
+    */
     default:
       return new AppError("PROVIDER_NOT_CONFIGURED", {
         userMessage:
           httpStatus >= 500
             ? "El servicio de consulta no responde ahora mismo. Inténtalo en unos minutos."
-            : "No pudimos consultar esa cuenta. Revisa el ID e inténtalo de nuevo.",
+            : "No pudimos consultar esa cuenta. Comprueba que el ID sea correcto; si lo es, " +
+              "vuelve a intentarlo en unos minutos.",
       });
   }
 }
@@ -133,6 +231,36 @@ async function pedir<T>(ruta: string, params: Record<string, string>): Promise<T
 
   // Igual que con los demás proveedores: un 200 no basta, se exige status true.
   if (!res.ok || !sobre || sobre.status !== true || sobre.data === undefined) {
+    /*
+      Se deja rastro ANTES de traducir, y de todos los fallos, no solo de los
+      que sabemos nombrar.
+
+      Hasta ahora una consulta rechazada podía no dejar ni una línea: el
+      traductor solo escribía en el log cuando reconocía el código, y
+      `consultarCuenta` se salta sus dos avisos justo cuando fallan las dos
+      mitades a la vez — que es exactamente el caso en el que el comprador ve
+      un error. El único rastro era un PROVIDER_NOT_CONFIGURED genérico, sin
+      cuenta, sin endpoint y sin motivo: nada con lo que empezar a mirar.
+
+      Se comprobó el 2/11/2026 contra su API que el código viaja en `error` y
+      la descripción en `message`:
+
+        {"status":false,"code":401,"error":"INVALID_API_KEY",
+         "message":"Invalid or inactive API key.","data":null}
+
+      Es decir, leer `error` es correcto y los nombres de este switch son los
+      suyos, no una invención nuestra. Así que un fallo que acabe en la rama
+      por defecto significa una cosa sola: mandan un código que todavía no
+      conocemos. `message` es lo que nos dirá cuál sin tener que adivinar.
+    */
+    logger.warn("SixoFire rechazó la consulta", {
+      ruta,
+      uid: params.uid ?? null,
+      httpStatus: res.status,
+      codigo: sobre?.error ?? null,
+      mensaje: sobre?.message ?? null,
+    });
+
     throw traducirFallo(res.status, sobre?.error);
   }
   return sobre.data;
@@ -259,6 +387,64 @@ export interface ResultadoConsulta {
   faltaOfertas: boolean;
 }
 
+interface RespuestaInfo {
+  basicInfo?: { accountId?: string; nickname?: string | null; region?: string | null };
+}
+
+/**
+ * ¿Existe esta cuenta? `true`, `false`, o `null` cuando no se pudo averiguar.
+ *
+ * Usa /account/info, un permiso que la licencia ya tenía y que no gastábamos:
+ * su contador seguía intacto en 10,000 mientras los otros dos iban por 1,030.
+ *
+ * Hace falta porque el fallo habitual de las promociones llega como
+ * "UID not found or failed to generate valid session after multiple attempts",
+ * una sola frase que mezcla las dos causas. Sin preguntar aparte, o acusamos
+ * al comprador de escribir mal un ID que estaba perfecto —que es justo la
+ * queja del 2/11/2026—, o mandamos a "volver en unos minutos" a alguien que
+ * tecleó mal y va a volver eternamente.
+ */
+async function cuentaExiste(uid: string): Promise<boolean | null> {
+  try {
+    const info = await pedir<RespuestaInfo>("/account/info", { uid });
+    return Boolean(info?.basicInfo?.accountId);
+  } catch (e) {
+    if (e instanceof AppError && e.code === "INVALID_PLAYER_ID") return false;
+    // Cualquier otro fallo —el límite de Garena, por ejemplo— es "no sabemos".
+    // Decir que la cuenta no existe porque no pudimos preguntar sería repetir
+    // el mismo error con otra cara.
+    return null;
+  }
+}
+
+/**
+ * Convierte "falló todo" en el motivo concreto, preguntando quién tiene la culpa.
+ *
+ * Solo se llama cuando las dos mitades fallaron, que es el único caso en el
+ * que el comprador se queda con una pantalla de error. Es una petición de más,
+ * pero de un cupo aparte y solo cuando ya hay un problema.
+ */
+async function precisarFallo(motivo: unknown, uid: string): Promise<unknown> {
+  const existe = await cuentaExiste(uid);
+
+  if (existe === false) {
+    return new AppError("INVALID_PLAYER_ID", {
+      userMessage:
+        "No encontramos ninguna cuenta de Free Fire con ese ID. Revísalo y vuelve a intentarlo.",
+    });
+  }
+
+  if (existe === true) {
+    return new AppError("PROVIDER_NOT_CONFIGURED", {
+      userMessage:
+        "Tu ID está bien y encontramos tu cuenta, pero ahora mismo no podemos leer sus " +
+        "promociones. Es cosa del servicio, no tuya: inténtalo de nuevo en unos minutos.",
+    });
+  }
+
+  return motivo;
+}
+
 /**
  * Las dos consultas a la vez.
  *
@@ -281,8 +467,13 @@ export async function consultarCuenta(uid: string): Promise<ResultadoConsulta> {
 
   // Si fallan las DOS, no hay nada que enseñar: se propaga el error de la
   // primera para que el comprador vea un motivo y no una pantalla vacía.
+  //
+  // El aviso va aquí y no más abajo porque los dos `logger.warn` del final
+  // quedan detrás de este `throw`: el único caso en el que el comprador se
+  // queda sin nada era justo el único que no se anotaba.
   if (nivel.status === "rejected" && ofertas.status === "rejected") {
-    throw nivel.reason;
+    logger.warn("SixoFire: la consulta falló entera, el comprador no vio nada", { uid });
+    throw await precisarFallo(nivel.reason, uid);
   }
 
   const n = nivel.status === "fulfilled" ? nivel.value : null;

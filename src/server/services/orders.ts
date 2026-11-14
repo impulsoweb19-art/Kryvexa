@@ -11,7 +11,6 @@ import { after } from "next/server";
 
 import { sendManualOrderNotification } from "@/lib/whatsapp";
 import { esPromocionDeCuenta, getPurchasableProduct, sellPriceCents } from "./catalog";
-import { asegurarPromocionDisponible, olvidarCuenta } from "./sixoff";
 import {
   asegurarProveedorDisponible,
   esCaidaDelProveedor,
@@ -147,51 +146,20 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   await asegurarProveedorDisponible(product.providerCode);
 
   /*
-    Las promociones no se listan en la tienda, pero el enlace directo existe.
-    Sin esto, cualquiera podría comprar un paquete de nivel que su cuenta no
-    tiene, y el dueño tendría que devolverle el dinero después de no poder
-    entregarlo. Se comprueba contra el proveedor antes de cobrar.
+    Las promociones de cuenta se retiraron el 14/11/2026 a petición del dueño:
+    llevaban semanas sin funcionar porque SixoFire no consigue abrir sesión
+    contra Garena para leerlas (ver `services/sixoff.ts`).
+
+    Los artículos NO se borran —hay pedidos antiguos que los referencian y el
+    historial debe seguir cuadrando—, pero tampoco se pueden comprar. Ya no se
+    listan en la tienda, pero el enlace directo sigue existiendo y alguien lo
+    puede tener guardado: sin este corte, compraría una promoción que nadie va
+    a poder entregarle.
   */
   if (esPromocionDeCuenta(product)) {
-    /*
-      Una promoción por cuenta, y lo decide NUESTRO registro.
-
-      No basta con preguntarle al proveedor. Los descuentos RD desaparecen de su
-      API en cuanto se usan, pero los paquetes de nivel siguen figurando como
-      disponibles un buen rato después de entregados — lo comprobó el dueño el
-      18/10/2026, cuando un cliente le compró dos veces el mismo paquete de
-      nivel 30 y él solo pudo entregarle uno.
-
-      Tampoco vale mirar solo los pedidos pendientes: al marcar el primero como
-      entregado se liberaría el bloqueo y podrían comprarlo otra vez mientras
-      Garena siga mostrándolo. Cuentan todos los pedidos de esa promoción para
-      ese jugador, salvo los devueltos — esos no se entregaron, así que no
-      consumieron nada.
-    */
-    const [yaPedido] = await db
-      .select({ code: orders.code, status: orders.status })
-      .from(orders)
-      .where(
-        and(
-          eq(orders.productId, product.id),
-          ne(orders.status, "REFUNDED"),
-          sql`${orders.inputs}->>'input1' = ${input.inputs.input1 ?? ""}`,
-        ),
-      )
-      .limit(1);
-
-    if (yaPedido) {
-      throw new AppError("CONFLICT", {
-        userMessage:
-          yaPedido.status === "COMPLETED"
-            ? `Esta promoción ya se activó en tu cuenta (pedido ${yaPedido.code}). ` +
-              "Si crees que es un error, escríbenos."
-            : `Ya tienes esta promoción pedida (${yaPedido.code}) y está pendiente de entrega. ` +
-              "Espera a que la activemos antes de volver a comprarla.",
-      });
-    }
-
-    await asegurarPromocionDisponible(product.externalId, input.inputs.input1);
+    throw new AppError("PRODUCT_UNAVAILABLE", {
+      userMessage: "Este artículo ya no está a la venta.",
+    });
   }
 
   const priceCents = sellPriceCents(product, config);
@@ -565,16 +533,6 @@ export async function adminResolveOrder(
     failureMessage: note ?? null,
     completedAt: resolution === "COMPLETED" ? new Date() : order.completedAt,
   });
-
-  /*
-    Entregado un paquete de promoción, Garena deja de ofrecérselo a esa cuenta.
-    Sin esto el jugador lo seguiría viendo disponible hasta media hora después
-    —el tiempo que guardamos la consulta— y podría intentar comprarlo otra vez.
-  */
-  if (esPromocionDeCuenta(order)) {
-    const uid = (order.inputs as Record<string, string>)?.input1;
-    if (uid) olvidarCuenta(uid);
-  }
 
   await recordAudit({
     actorId: admin.id,
