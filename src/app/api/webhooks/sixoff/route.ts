@@ -74,10 +74,23 @@ export async function POST(req: Request) {
       documentan. Va por `redact`, que tapa el `signingSecret` por si lo
       incluyen.
     */
-    logger.warn("Webhook de SixoFire sin referencia reconocible: se repasa todo", {
+    logger.warn("Webhook de SixoFire sin referencia reconocible", {
       cuerpo: redact(payload),
     });
-    await reconcilePendingOrders(25);
+
+    /*
+      El repaso se pide con su propio tope GLOBAL. Es un amplificador —cada
+      uno consulta hasta 25 pedidos al proveedor—, así que sin esto bastaría
+      con mandar `{}` a esta ruta en bucle para que saliéramos a llamarles
+      miles de veces por minuto. Si ya se hizo hace nada, se omite: el cron lo
+      repite cada cinco minutos de todas formas.
+    */
+    try {
+      await consume(RULES.webhookSixoffBarrido, "global");
+      await reconcilePendingOrders(25);
+    } catch {
+      logger.info("Repaso omitido: ya se hizo uno hace menos de un minuto");
+    }
     return new Response(null, { status: 204 });
   }
 

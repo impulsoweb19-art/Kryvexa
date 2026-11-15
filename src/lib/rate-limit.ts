@@ -47,6 +47,18 @@ export const RULES = {
    */
   webhookSixoff: { action: "webhook.sixoff", limit: 120, windowSec: 60 },
   /**
+   * El repaso completo que dispara un aviso cuyo cuerpo no supimos leer.
+   *
+   * Va aparte y GLOBAL, no por IP, porque es un amplificador: cada repaso
+   * consulta hasta 25 pedidos contra el proveedor. Sin este tope, ciento
+   * veinte avisos vacíos por minuto se convertirían en tres mil llamadas
+   * salientes, y bastaría con mandar `{}` a la ruta para provocarlo.
+   *
+   * Dos por minuto sobran: el repaso es la misma operación que el cron hace
+   * cada cinco, así que pedirla más seguido no averigua nada nuevo.
+   */
+  webhookSixoffBarrido: { action: "webhook.sixoff.barrido", limit: 2, windowSec: 60 },
+  /**
    * Canje de códigos: apretado a propósito. Alguien podría intentar adivinar
    * códigos ajenos probando combinaciones, y aunque hay 28 millones posibles,
    * no hay razón para dejar que lo intente.
