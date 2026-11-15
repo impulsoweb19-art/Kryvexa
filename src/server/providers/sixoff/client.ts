@@ -5,7 +5,6 @@ import { providerTransactions } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger, redact } from "@/lib/logger";
 import { ProviderRequestError } from "../types";
-import { opcionesDeSalida } from "../salida";
 
 /**
  * Cliente HTTP de la TIENDA de SixoFire.
@@ -155,7 +154,25 @@ export async function request<T>(opts: RequestOptions): Promise<T> {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
       cache: "no-store",
-      ...opcionesDeSalida(),
+      /*
+        SIN el proxy de IP fija, al revés que los demás proveedores.
+
+        `salida.ts` existe porque RecargasAmérica exige que sus llamadas
+        lleguen desde una IP registrada. SixoFire no pide nada de eso: se la
+        llama a diario desde máquinas con IP doméstica y responde igual.
+
+        Y pasarla por el proxy de todos modos no salía gratis. El 14/11/2026,
+        con todo recién conectado, las cuatro primeras llamadas a
+        /account/info desde producción murieron con "Error de red: fetch
+        failed" mientras las mismas llamadas funcionaban desde fuera. El
+        proxy no alcanza a su API —se queda en el intento, sin siquiera un
+        código HTTP—, probablemente porque Cloudflare les filtra ese salto.
+
+        Así que aquí se sale directo. Si algún día SixoFire pide IP
+        registrada, se vuelve a poner `...opcionesDeSalida()` y se da de alta
+        la IP del proxy en su panel; mientras tanto, añadirlo solo suma una
+        forma de fallar a cambio de nada.
+      */
     });
 
     httpStatus = res.status;
