@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/reconcile-orders",
       "schedule": "*/5 13-23,0-4 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-orders",
+      "schedule": "*/15 5-12 * * *"
     }
   ]
 }
