@@ -163,9 +163,19 @@ export async function listStoreProducts(filter?: (p: Product) => boolean): Promi
   return filtered.map((p) => toStoreProduct(p, config));
 }
 
-/** Filtros listos para usar en las páginas de tienda de cada juego. */
+/**
+ * Filtros listos para usar en las páginas de tienda de cada juego.
+ *
+ * `sixoff` entra aquí sin mirar el `gameName` porque su tienda, igual que
+ * RecargasAmérica, solo sirve Free Fire. Olvidarlo el 14/11/2026 dejó los
+ * pases, fragmentos y cajas fuera de la tienda en cuanto se reapuntaron a ese
+ * proveedor: seguían visibles y activos en la base, pero ningún filtro los
+ * reconocía y por tanto no los listaba ninguna página.
+ */
 export const isFreeFireProduct = (p: Product) =>
-  p.providerCode === "recargas_america" || (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName));
+  p.providerCode === "recargas_america" ||
+  p.providerCode === "sixoff" ||
+  (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName));
 
 export const isMobileLegendsProduct = (p: Product) =>
   p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile?\s*legends/i.test(p.gameName));

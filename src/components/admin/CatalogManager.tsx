@@ -32,8 +32,13 @@ export interface AdminProductRow {
  * archivo es server-only y este componente corre en el navegador.
  */
 const GAME_TABS = [
+  // `sixoff` va sin mirar el gameName, igual que recargas_america: su tienda
+  // solo sirve Free Fire. Debe seguir a `isFreeFireProduct` en
+  // `services/catalog.ts`; si se añade un proveedor allí y aquí no, el dueño
+  // deja de ver en su panel productos que los compradores sí ven en la tienda.
   { key: "free-fire", label: "Free Fire", match: (p: AdminProductRow) =>
-      p.providerCode === "recargas_america" || (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName)) },
+      p.providerCode === "recargas_america" || p.providerCode === "sixoff" ||
+      (p.providerCode === "manual" && /free\s*fire/i.test(p.gameName)) },
   { key: "mobile-legends", label: "Mobile Legends", match: (p: AdminProductRow) =>
       p.providerCode === "epinby" || (p.providerCode === "manual" && /mobile?\s*legends/i.test(p.gameName)) },
   // Blood Strike es solo de entrega manual: no hay proveedor que sincronizar.

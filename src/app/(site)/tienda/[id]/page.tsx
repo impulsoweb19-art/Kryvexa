@@ -66,6 +66,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="mt-4 flex flex-wrap gap-2">
               {product.providerCode === "manual" ? (
                 <Badge tone="warn">Entrega manual</Badge>
+              ) : product.providerCode === "sixoff" ? (
+                /*
+                  Automática sí, pero no instantánea: su tienda encola el
+                  pedido cuando se queda sin stock. El dueño mide entregas de
+                  más de 24 h y ninguna por encima de 48. Decir solo
+                  "automática" aquí hace esperar segundos, y ese malentendido
+                  lo paga él en reclamos.
+                */
+                <Badge tone="info">Automática · hasta 48 h</Badge>
               ) : (
                 <Badge tone="info">Entrega automática</Badge>
               )}
