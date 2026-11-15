@@ -4,11 +4,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { clientIp } from "@/lib/api";
-import { logger } from "@/lib/logger";
+import { logger, redact } from "@/lib/logger";
 import { consume, RULES } from "@/lib/rate-limit";
 import { getProvider } from "@/server/providers/registry";
 import { PROVIDER_CODE } from "@/server/providers/sixoff";
-import { applyProviderStatus } from "@/server/services/orders";
+import { applyProviderStatus, reconcilePendingOrders } from "@/server/services/orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,25 +16,34 @@ export const dynamic = "force-dynamic";
 /**
  * Aviso de SixoFire sobre un pedido de su tienda.
  *
- * Se registra al crear cada pedido, en el campo `webhook_url`, y ellos avisan
- * de `order.created`, `order.progress`, `order.complete`, `order.error` y
+ * Se registra al crear cada pedido, en el campo `webhook_url`, y avisan de
+ * `order.created`, `order.progress`, `order.complete`, `order.error` y
  * `order.paused`.
  *
- * ── POR QUÉ ESTE NO VERIFICA LA FIRMA ───────────────────────────────────────
- * Su respuesta de creación devuelve un `signingSecret` y dice que la firma
- * viaja en la cabecera `X-SixoFire-Signature`, pero NO documenta cómo se
- * calcula: ni sobre qué se hace el HMAC, ni si va en hexadecimal o en base64,
- * ni si entra una marca de tiempo. Escribir una verificación a ojo tiene dos
- * finales, y los dos son malos: o rechaza todos los avisos legítimos, o
- * acepta cualquier cosa y da una falsa sensación de seguridad.
+ * ── ESTA RUTA NO SE CREE NADA DE LO QUE RECIBE ──────────────────────────────
+ * Devuelven un `signingSecret` y una cabecera `X-SixoFire-Signature`, pero no
+ * documentan cómo se calcula la firma: ni sobre qué se hace el HMAC, ni si va
+ * en hexadecimal o en base64, ni si entra una marca de tiempo. Una
+ * verificación escrita a ojo o rechaza todo lo legítimo o acepta cualquier
+ * cosa, y lo segundo es peor que no comprobar nada, porque da falsa
+ * tranquilidad.
  *
- * Así que esta ruta NO SE CREE NADA de lo que recibe. Del cuerpo solo saca un
- * número de pedido, y el estado se lo pregunta a SixoFire con NUESTRA clave,
- * igual que hace la conciliación por cron. Un aviso falsificado consigue, como
+ * Así que del cuerpo solo se saca un número de pedido, y el estado se le
+ * pregunta a SixoFire con NUESTRA clave. Un aviso falsificado consigue, como
  * mucho, que miremos un pedido antes de tiempo.
  *
- * Cuando documenten el algoritmo se añade la comprobación de firma encima,
- * como segunda barrera. Pero el diseño ya no depende de ella.
+ * ── Y TAMPOCO SE FÍA DE LA FORMA DEL CUERPO ─────────────────────────────────
+ * Tampoco documentan el cuerpo del aviso. La primera versión buscaba el id
+ * solo en `data.id` o `id` y, si no estaba, respondía 204 sin hacer nada: en
+ * la noche del 14 al 15/11/2026 no se cerró ni un pedido y el dueño encontró
+ * las entregas desfasadas ocho horas. Su asesor confirmó que los avisos sí
+ * salen, así que el que no entendía era este código.
+ *
+ * Ahora se busca el id en los sitios habituales Y, si aun así no aparece, se
+ * repasan igualmente los pedidos pendientes. Porque el aviso en el fondo solo
+ * significa "algo cambió, ve a mirar", y eso se puede obedecer sin entender
+ * una sola palabra del cuerpo. De paso se registra el cuerpo entero: es la
+ * única forma de aprender su formato real.
  * ────────────────────────────────────────────────────────────────────────────
  *
  * Que llegue el mismo aviso dos veces es inofensivo: `applyProviderStatus` no
@@ -48,22 +57,27 @@ export async function POST(req: Request) {
     return new Response(null, { status: 429 });
   }
 
-  let payload: { id?: number | string; data?: { id?: number | string }; event?: string };
+  let payload: Record<string, unknown>;
   try {
-    payload = (await req.json()) as typeof payload;
+    payload = (await req.json()) as Record<string, unknown>;
   } catch {
     logger.warn("Webhook de SixoFire con cuerpo no interpretable");
     // 2xx a propósito: reintentarlo no lo va a volver legible.
     return new Response(null, { status: 204 });
   }
 
-  // El identificador aparece como `data.id` en su respuesta de creación; se
-  // acepta también en la raíz por si el aviso viaja más plano.
-  const bruto = payload.data?.id ?? payload.id;
-  const referencia = bruto != null ? String(bruto) : null;
+  const referencia = buscarReferencia(payload);
 
-  if (!referencia || !/^[0-9]+$/.test(referencia)) {
-    logger.warn("Webhook de SixoFire sin un id de pedido utilizable", { event: payload.event });
+  if (!referencia) {
+    /*
+      El cuerpo entero al log, que es como se descubre el formato que no
+      documentan. Va por `redact`, que tapa el `signingSecret` por si lo
+      incluyen.
+    */
+    logger.warn("Webhook de SixoFire sin referencia reconocible: se repasa todo", {
+      cuerpo: redact(payload),
+    });
+    await reconcilePendingOrders(25);
     return new Response(null, { status: 204 });
   }
 
@@ -95,4 +109,35 @@ export async function POST(req: Request) {
   }
 
   return new Response(null, { status: 204 });
+}
+
+/**
+ * Busca el id del pedido allá donde lo pongan.
+ *
+ * Su respuesta de creación lo trae en `data.id`, así que ese es el candidato
+ * más probable, pero el cuerpo del aviso no tiene por qué seguir la misma
+ * forma. Se prueban los nombres que usa todo el mundo antes de rendirse.
+ *
+ * Solo se aceptan dígitos: sus ids son enteros, y así un valor con cualquier
+ * otra cosa dentro no llega nunca a la consulta.
+ */
+function buscarReferencia(payload: Record<string, unknown>): string | null {
+  const data = (payload.data ?? payload.order ?? {}) as Record<string, unknown>;
+
+  const candidatos = [
+    data.id,
+    data.orderId,
+    data.order_id,
+    payload.id,
+    payload.orderId,
+    payload.order_id,
+    payload.saleOrderId,
+    payload.sale_order_id,
+  ];
+
+  for (const c of candidatos) {
+    if (typeof c === "number" && Number.isInteger(c) && c > 0) return String(c);
+    if (typeof c === "string" && /^[0-9]+$/.test(c)) return c;
+  }
+  return null;
 }
