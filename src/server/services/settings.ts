@@ -49,6 +49,19 @@ export interface StoreConfig {
   storeNoticeText: string;
   /** Avisar en el panel si el saldo del revendedor baja de aquí (USD, céntimos). */
   providerLowBalanceUsdCents: number;
+  /**
+   * Nota que acompaña al artículo en el buzón del juego, en las entregas de
+   * SixoFire.
+   *
+   * Vacío = no se manda nada y Garena pone su texto por defecto.
+   *
+   * SixoFire solo lo acepta con letras, números y espacios, y hasta 100
+   * caracteres. Ojo: si llega algo fuera de eso, su API **rechaza el pedido
+   * entero**, no solo la nota. Por eso se valida al guardar y además se sanea
+   * antes de enviarlo (ver `providers/sixoff/index.ts`): el dueño edita esto
+   * desde su panel, y una tilde de más no puede costarle una venta.
+   */
+  sixoffGiftMessage: string;
 }
 
 export const DEFAULT_CONFIG: StoreConfig = {
@@ -70,6 +83,7 @@ export const DEFAULT_CONFIG: StoreConfig = {
   storeNoticeEnabled: false,
   storeNoticeText: "",
   providerLowBalanceUsdCents: 2000,
+  sixoffGiftMessage: "Gracias por elegirnos",
 };
 
 const KEYS = Object.keys(DEFAULT_CONFIG) as (keyof StoreConfig)[];

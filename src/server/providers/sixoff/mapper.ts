@@ -163,3 +163,29 @@ export function mapItem(raw: RawItem): ProviderProduct {
 export function aceptaMensaje(raw: RawItem | undefined): boolean {
   return (raw?.itemType ?? "").toUpperCase() === "GIFT";
 }
+
+/**
+ * Deja la nota del regalo como SixoFire la acepta, o devuelve null si no queda
+ * nada que mandar.
+ *
+ * El texto lo escribe el dueño desde su panel, y allí ya se valida. Esto es la
+ * segunda red: si alguna vez entra un valor raro —una importación, una
+ * migración, un copiar y pegar con tildes— lo que está en juego no es la nota,
+ * es la VENTA. Su API responde 400 y no crea el pedido si el mensaje no le
+ * cuadra, así que es mejor entregar sin nota que no entregar.
+ *
+ * Se quitan tildes y signos en vez de rechazar el texto entero: "¡Gracias!"
+ * se convierte en "Gracias" y el cliente recibe algo, que es lo que importa.
+ */
+export function mensajeSaneado(texto: string | undefined): string | null {
+  const limpio = (texto ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // tildes: "á" → "a"
+    .replace(/[^A-Za-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100)
+    .trim();
+
+  return limpio.length > 0 ? limpio : null;
+}

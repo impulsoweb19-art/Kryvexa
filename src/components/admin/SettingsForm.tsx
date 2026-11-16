@@ -21,6 +21,7 @@ export interface SettingsValues {
   purchasesEnabled: boolean;
   storeNoticeEnabled: boolean;
   storeNoticeText: string;
+  sixoffGiftMessage: string;
 }
 
 export function SettingsForm({ initial }: { initial: SettingsValues }) {
@@ -129,6 +130,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
       purchasesEnabled,
       storeNoticeEnabled: avisoActivo,
       storeNoticeText: avisoTexto,
+      sixoffGiftMessage: String(form.get("sixoffGiftMessage") ?? "").trim(),
     });
 
     if (!parsed.success) {
@@ -310,6 +312,20 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
             <Input id="supportEmail" name="supportEmail" type="email" defaultValue={initial.supportEmail} />
           </Field>
         </div>
+
+        <Field
+          label="Nota en el buzon del juego (pases, fragmentos y cajas)"
+          htmlFor="sixoffGiftMessage"
+          error={errors.sixoffGiftMessage}
+          hint="Acompana al articulo cuando le llega al jugador. Solo letras sin tildes, numeros y espacios, hasta 100. Dejalo vacio para no enviar nada."
+        >
+          <Input
+            id="sixoffGiftMessage"
+            name="sixoffGiftMessage"
+            maxLength={100}
+            defaultValue={initial.sixoffGiftMessage}
+          />
+        </Field>
       </Card>
 
       <Card className="space-y-4">

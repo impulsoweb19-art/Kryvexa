@@ -64,6 +64,7 @@ export default async function AdminSettingsPage() {
           purchasesEnabled: config.purchasesEnabled,
           storeNoticeEnabled: config.storeNoticeEnabled,
           storeNoticeText: config.storeNoticeText,
+          sixoffGiftMessage: config.sixoffGiftMessage,
         }}
       />
     </div>

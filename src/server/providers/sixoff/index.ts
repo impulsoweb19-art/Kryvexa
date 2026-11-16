@@ -19,17 +19,14 @@ import {
   aceptaMensaje,
   estadoNormalizado,
   mapItem,
+  mensajeSaneado,
   partirExternalId,
   usdACentimos,
 } from "./mapper";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { getConfig } from "@/server/services/settings";
 
-/** Lo que se escribe en el buzón del juego junto al artículo entregado. */
-const MENSAJE_REGALO = "Gracias por elegirnos";
-
-/** Su API lo limita a 100 caracteres y solo letras, números y espacios. */
-const MAX_MENSAJE = 100;
 
 /**
  * El UID destino que acepta SixoFire es de 8 a 12 dígitos, no de 8 a 15 como
@@ -213,7 +210,10 @@ class SixoFireShopService implements ProviderAdapter {
     */
     try {
       const item = (await itemsPorId()).get(productId);
-      if (aceptaMensaje(item)) body.message = MENSAJE_REGALO.slice(0, MAX_MENSAJE);
+      if (aceptaMensaje(item)) {
+        const nota = mensajeSaneado((await getConfig()).sixoffGiftMessage);
+        if (nota) body.message = nota;
+      }
     } catch {
       logger.warn("No se pudo leer el catálogo de SixoFire: se omite el mensaje de regalo", {
         productId,

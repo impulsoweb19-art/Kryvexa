@@ -180,6 +180,24 @@ export const settingsSchema = z.object({
   purchasesEnabled: z.boolean(),
   storeNoticeEnabled: z.boolean(),
   storeNoticeText: cleanString(300).optional(),
+  /**
+   * La nota que viaja con el artículo al buzón del juego en las entregas de
+   * SixoFire.
+   *
+   * Se valida aquí con los límites de ELLOS —letras, números y espacios, 100
+   * caracteres— y no con los nuestros, porque si el texto no les cuadra su
+   * API rechaza el PEDIDO ENTERO, no solo la nota. Mejor que el dueño vea el
+   * error al guardar, en su panel y sin consecuencias, que descubrirlo cuando
+   * a un cliente no le llegue la compra.
+   *
+   * Sin tildes ni signos a propósito: su campo los rechaza. Por eso el valor
+   * por defecto es "Gracias por elegirnos" y no "¡Gracias por elegirnos!".
+   */
+  sixoffGiftMessage: cleanString(100)
+    .refine((v) => /^[A-Za-z0-9 ]*$/.test(v), {
+      message: "Solo letras sin tildes, números y espacios. Sin signos ni emojis.",
+    })
+    .optional(),
 });
 
 export const productOverrideSchema = z.object({
